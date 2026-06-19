@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { fetchModelCatalog, evaluateSlug, TOP_MODELS, type ImageModel } from "@/core";
 
 const CUSTOM = "__custom__";
@@ -76,18 +77,21 @@ export function ModelSelect({
   return (
     <div className="space-y-2">
       <label className="text-xs uppercase tracking-wide text-neutral-500">Model</label>
-      <select
-        value={isCustom ? CUSTOM : value}
-        onChange={handleSelect}
-        className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-      >
-        {models.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.curated ? "★ " : ""}{m.name}
-          </option>
-        ))}
-        <option value={CUSTOM}>Custom…</option>
-      </select>
+      <div className="relative">
+        <select
+          value={isCustom ? CUSTOM : value}
+          onChange={handleSelect}
+          className="w-full appearance-none rounded-lg border border-neutral-700 bg-neutral-950 py-2 pl-3 pr-10 text-sm outline-none focus:border-neutral-500"
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.curated ? "★ " : ""}{m.name}
+            </option>
+          ))}
+          <option value={CUSTOM}>Custom…</option>
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+      </div>
       {isCustom && (
         <div className="space-y-1">
           <input

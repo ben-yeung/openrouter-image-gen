@@ -31,7 +31,7 @@ export function PromptForm({
           <input
             type="number" min={1} max={8} value={count}
             onChange={(e) => setCount(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
-            className="w-20 rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+            className="w-24 rounded-lg border border-neutral-700 bg-neutral-950 py-2 pl-3 pr-3 text-sm outline-none focus:border-neutral-500 [&::-webkit-inner-spin-button]:mr-1"
           />
         </div>
         <div className="flex items-center gap-2">
