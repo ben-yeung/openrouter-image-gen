@@ -46,9 +46,9 @@ describe("ModelSelect", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "__custom__" } });
     expect(screen.getByPlaceholderText("author/model-slug")).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox"), {
-      target: { value: "black-forest-labs/flux-1.1-pro" },
+      target: { value: "google/gemini-3-pro-image-preview" },
     });
-    expect(onChange).toHaveBeenCalledWith("black-forest-labs/flux-1.1-pro");
+    expect(onChange).toHaveBeenCalledWith("google/gemini-3-pro-image-preview");
     expect(screen.queryByPlaceholderText("author/model-slug")).toBeNull();
   });
 });

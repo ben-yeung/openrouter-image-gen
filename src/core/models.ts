@@ -20,11 +20,17 @@ export function evaluateSlug(
   return { status: "invalid", commit: false };
 }
 
+// Curated, ordered defaults. Every id MUST be a real image-output model in the
+// OpenRouter catalog (verified against https://openrouter.ai/api/v1/models) —
+// curated entries are shown even when the live list fails to load, so a bogus
+// slug here produces a 400 on generation. There is currently no Riverflow/FLUX
+// image model in the catalog; the image-output models are the Gemini "Nano
+// Banana" family and OpenAI's GPT image models.
 export const TOP_MODELS: ImageModel[] = [
   { id: "google/gemini-3.1-flash-image-preview", name: "Nano Banana 2", curated: true },
   { id: "google/gemini-3-pro-image-preview", name: "Nano Banana Pro", curated: true },
-  { id: "sourceful/riverflow-2.5-pro", name: "Riverflow 2.5 Pro", curated: true },
-  { id: "black-forest-labs/flux-1.1-pro", name: "FLUX 1.1 Pro", curated: true },
+  { id: "openai/gpt-5.4-image-2", name: "GPT-5.4 Image 2", curated: true },
+  { id: "openai/gpt-5-image", name: "GPT-5 Image", curated: true },
 ];
 
 const MODELS_URL = "https://openrouter.ai/api/v1/models";
