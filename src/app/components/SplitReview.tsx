@@ -55,7 +55,6 @@ export function SplitReview({
           className={`text-xs ${large ? "font-medium text-red-400" : "text-neutral-500"}`}
         >
           This will generate {n} image{n === 1 ? "" : "s"} ({n} request{n === 1 ? "" : "s"})
-          {large ? " — that's a lot" : ""}
         </span>
         <button
           onClick={onConfirm}
