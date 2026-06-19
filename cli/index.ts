@@ -3,7 +3,7 @@ import {
 } from "@clack/prompts";
 import clipboard from "clipboardy";
 import { loadKey, saveKey, loadSplitModel, saveSplitModel } from "./config.js";
-import { fetchImageModels, TOP_MODELS } from "../src/core/models.js";
+import { fetchImageModels, isValidSlugFormat, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
 import { splitPromptsLLM, batchLabel } from "../src/core/split.js";
@@ -88,7 +88,11 @@ async function generateFlow(apiKey: string) {
 
   let modelId = model as string;
   if (modelId === "__custom__") {
-    const slug = await text({ message: "Custom model slug:" });
+    const slug = await text({
+      message: "Custom model slug:",
+      validate: (v) =>
+        isValidSlugFormat(v.trim()) ? undefined : "Invalid model slug (expected author/model).",
+    });
     bail(slug);
     modelId = (slug as string).trim();
   }
