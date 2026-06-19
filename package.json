@@ -10,8 +10,7 @@
     "cli": "tsx cli/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",

@@ -24,6 +24,9 @@ export function ModelSelect({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
       >
+        {value && !models.some((m) => m.id === value) && (
+          <option value={value}>★ {value} (custom)</option>
+        )}
         {models.map((m) => (
           <option key={m.id} value={m.id}>
             {m.curated ? "★ " : ""}{m.name}

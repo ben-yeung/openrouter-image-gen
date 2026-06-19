@@ -10,6 +10,9 @@ interface SaveBody {
   images?: GeneratedImage[];
 }
 
+// Local-tool assumption: this unauthenticated endpoint writes generated images
+// to ./generations on the dev server's filesystem. It is safe only because the
+// app runs locally (next dev binds localhost). Do NOT expose this server publicly.
 export async function POST(req: Request) {
   try {
     const { prompt, model, images } = (await req.json()) as SaveBody;
