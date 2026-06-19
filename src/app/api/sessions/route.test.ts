@@ -44,4 +44,26 @@ describe("POST /api/sessions", () => {
     const json = await res.json();
     expect(json.error).toBeTruthy();
   });
+
+  it("saves a batch with per-image prompts", async () => {
+    const { POST } = await import("./route");
+    const b64 = Buffer.from("img").toString("base64");
+    const req = new Request("http://localhost/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        prompt: "a cat +1 more",
+        model: "m",
+        kind: "batch",
+        images: [
+          { index: 0, dataUrl: `data:image/png;base64,${b64}`, seed: 1, prompt: "a cat" },
+          { index: 1, dataUrl: `data:image/png;base64,${b64}`, seed: 2, prompt: "a dog" },
+        ],
+      }),
+    });
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.session.kind).toBe("batch");
+    expect(json.session.images[1].prompt).toBe("a dog");
+  });
 });
