@@ -77,25 +77,21 @@ export default function Home() {
         model={model} setModel={setModel}
         count={count} setCount={setCount}
         disabled={loading} onGenerate={onGenerate}
+        secondaryAction={prompt.trim() ? (
+          <button
+            onClick={openSplitConfirm}
+            disabled={loading || splitting}
+            className="flex items-center gap-2 rounded-lg border border-neutral-700 px-4 py-2.5 text-sm hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Scissors className="h-4 w-4" /> Split prompts
+          </button>
+        ) : null}
       />
 
-      {prompt.trim() && (
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={openSplitConfirm}
-              disabled={loading || splitting}
-              className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Scissors className="h-3.5 w-3.5" /> Split into separate prompts
-            </button>
-          </div>
-          {splitError && (
-            <p className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
-              {splitError}
-            </p>
-          )}
-        </div>
+      {splitError && (
+        <p className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+          {splitError}
+        </p>
       )}
 
       {splitList && (

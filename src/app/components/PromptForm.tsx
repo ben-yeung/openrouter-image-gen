@@ -1,14 +1,16 @@
 "use client";
+import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import { ModelSelect } from "./ModelSelect";
 
 export function PromptForm({
-  prompt, setPrompt, model, setModel, count, setCount, disabled, onGenerate,
+  prompt, setPrompt, model, setModel, count, setCount, disabled, onGenerate, secondaryAction,
 }: {
   prompt: string; setPrompt: (v: string) => void;
   model: string; setModel: (v: string) => void;
   count: number; setCount: (n: number) => void;
   disabled: boolean; onGenerate: () => void;
+  secondaryAction?: ReactNode;
 }) {
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5">
@@ -32,13 +34,16 @@ export function PromptForm({
             className="w-20 rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
           />
         </div>
-        <button
-          onClick={onGenerate}
-          disabled={disabled}
-          className="flex items-center gap-2 rounded-lg bg-neutral-100 px-5 py-2.5 text-sm font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Sparkles className="h-4 w-4" /> Generate
-        </button>
+        <div className="flex items-center gap-2">
+          {secondaryAction}
+          <button
+            onClick={onGenerate}
+            disabled={disabled}
+            className="flex items-center gap-2 rounded-lg bg-neutral-100 px-5 py-2.5 text-sm font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Sparkles className="h-4 w-4" /> Generate
+          </button>
+        </div>
       </div>
     </div>
   );
