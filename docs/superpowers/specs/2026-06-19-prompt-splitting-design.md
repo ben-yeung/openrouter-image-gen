@@ -4,6 +4,13 @@
 **Status:** Approved (brainstorming)
 **Builds on:** [2026-06-19-openrouter-image-gen-design.md](./2026-06-19-openrouter-image-gen-design.md)
 
+> **Revision 2026-06-19:** Dropped the heuristic/newline splitter
+> (`splitPromptsHeuristic`) — line breaks are an unreliable signal. Splitting is
+> now **LLM-only**: an explicit "Split into separate prompts" control opens a
+> confirmation (web modal `SplitConfirmModal` / CLI confirm) that runs the split
+> model to extract each prompt **verbatim**. Sections below reflect this; the
+> `generateBatch`/storage/settings design is unchanged.
+
 ## Summary
 
 A prompt-intelligence layer that sits in front of image generation. When the user
@@ -23,8 +30,10 @@ review/confirm step is the safety net for any mis-split.
 - Opt-in via a review/confirm gate that always shows the **total request count**
   (with a visible warning when large), since each request spends the user's BYOK
   credits.
-- Two-tier detection: fast, free **heuristic** splitting first; a cheap **LLM
-  fallback** ("AI split") for messy single-block prose.
+- Extraction is done **entirely by a cheap LLM** (the split model). There is no
+  heuristic/newline splitting — line breaks are an unreliable signal. The user
+  triggers it explicitly (a "Split into separate prompts" button → confirmation),
+  and the model extracts each distinct prompt verbatim.
 - True web/CLI parity, reusing the shared `core/` module.
 - Persist a batch to disk in the existing folder format, extended so each image
   records its own prompt.
@@ -42,8 +51,8 @@ review/confirm step is the safety net for any mis-split.
 | Decision | Choice |
 |----------|--------|
 | Scope | Split only; no rewriting/enhancement |
-| Trigger | Opt-in; user reviews/edits the parsed list before generating |
-| Detection | Heuristic first; LLM fallback ("AI split") for single-block input |
+| Trigger | Opt-in; user reviews/edits the extracted list before generating |
+| Detection | **LLM-only** — split model extracts prompts verbatim; no heuristic/newline splitting |
 | P × V | **1 image per prompt**; variations control hidden/ignored in split mode |
 | Storage | **One flat batch folder**; each image's prompt recorded in `metadata.json` |
 | Concurrency | Throttle 5–10 in-flight (default 6); no hard cap |
@@ -59,13 +68,14 @@ extensions, and UI/CLI additions. The browser-safe-barrel invariant is preserved
 
 ```
 src/core/
-  split.ts        # NEW: splitPromptsHeuristic (pure), splitPromptsLLM (network)
+  split.ts        # NEW: splitPromptsLLM (LLM extraction), batchLabel, SplitError
   generate.ts     # + generateBatch(); shared throttled runner
   types.ts        # GeneratedImage.prompt?, Session.kind, DEFAULT_SPLIT_MODEL
   storage.ts      # saveSession persists per-image prompt + batch label
   index.ts        # + export split.ts (isomorphic, browser-safe)
 src/app/
-  lib/useSplit.ts         # NEW: heuristic + LLM split for the web
+  lib/useSplit.ts         # NEW: LLM extraction wrapper for the web
+  components/SplitConfirmModal.tsx  # NEW: confirm using the split model before extracting
   lib/useGeneration.ts    # extended to accept a prompt list (batch)
   lib/useSettings.ts      # NEW (or extend useApiKey): persist splitModel
   components/SplitReview.tsx   # NEW: editable parsed-prompt list + count/warning
@@ -79,42 +89,35 @@ cli/
 ### `split.ts` (isomorphic)
 
 ```ts
-// Pure, no network. Returns one entry per detected prompt.
-// If the input resolves to a single block, returns [input] (→ no auto-split).
-splitPromptsHeuristic(input: string): string[]
-
-// Network. Asks a cheap text model for a strict JSON array of prompt strings.
-// Parses defensively; throws SplitError on unparseable output.
+// Network. Asks the split model for a strict JSON array of prompt strings.
+// Parses defensively; throws SplitError on request failure or unparseable output.
 splitPromptsLLM(
   input: string,
   params: { apiKey: string; model?: string; signal?: AbortSignal },
   fetchImpl?: typeof fetch,
 ): Promise<string[]>
 
+batchLabel(prompts: string[]): string
+
 class SplitError extends Error {}
 ```
 
-**Heuristic algorithm** (first matching strategy wins):
+**LLM extraction** — `POST https://openrouter.ai/api/v1/chat/completions` with a
+system instruction that tells the model to extract each distinct image prompt
+**verbatim** (preserve wording; no rewriting, rephrasing, expanding, summarizing,
+merging, or inventing; light cleanup of list markers/quotes/whitespace only; do
+not copy shared context into individual prompts; exclude greetings and meta
+commentary), and to return ONLY a JSON array of strings (a single-element array
+for one image, `[]` for none). `model = params.model ?? <persisted split model>`.
+Parse: locate the first `[`…`]`, `JSON.parse`, validate it's a string array,
+trim + drop empties. On request failure or unparseable/empty output throw
+`SplitError`. The full system prompt lives in `src/core/split.ts`
+(`SPLIT_SYSTEM_PROMPT`).
 
-1. **Numbered items** — lines beginning `1.`, `1)`, `1 -`, `1:` (and 2, 3, …).
-2. **Bullets** — lines beginning `-`, `*`, or `•`.
-3. **Blank-line blocks** — split on one-or-more blank lines.
-4. **Plain newlines** — non-empty lines, each a prompt.
-
-For every strategy: strip the leading marker, `trim()`, drop empties. Then
-**collapse**: if the result has length ≤ 1, fall through to the next strategy;
-if all strategies yield ≤ 1, return `[input]` (single prompt — no split offered).
-
-**LLM fallback** — `POST https://openrouter.ai/api/v1/chat/completions` with a
-small system instruction ("Split the user's text into the distinct image prompts
-it contains. Return ONLY a JSON array of strings. Do not rewrite the prompts.")
-and `model = <persisted split model>`. Parse: locate the first `[`…`]`, `JSON.parse`,
-validate it's a string array. On any failure throw `SplitError("AI split didn't
-work — try editing your prompts manually.")`.
-
-**Detection rule (consumers):** run `splitPromptsHeuristic`. If `length > 1`,
-offer split with the list pre-filled. If `=== 1`, show an "AI split" affordance
-that calls `splitPromptsLLM`.
+**Trigger rule (consumers):** there is no automatic detection. The user clicks a
+"Split into separate prompts" control; a confirmation (web modal / CLI confirm)
+explains the call uses the split model, and on confirm `splitPromptsLLM` runs and
+its result populates the editable review list.
 
 ### `generate.ts` — batch generation
 
@@ -175,12 +178,14 @@ export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";  // NEW
 
 ### Web
 
-1. User types/pastes input in `PromptForm`. On change, run
-   `splitPromptsHeuristic`.
-2. If `>1` block → a **"Split into N prompts"** affordance appears. If `===1`
-   block → an **"AI split"** button appears.
-3. Either path opens **`SplitReview`**: an editable list of the parsed prompts
-   (edit / remove / add row). It shows **"This will generate N images (N
+1. User types/pastes input in `PromptForm`. Whenever the prompt is non-empty, a
+   **"Split into separate prompts"** button appears (no automatic detection).
+2. Clicking it opens **`SplitConfirmModal`**, which names the split model and
+   explains it will make one extraction call. (No key → open the key dialog
+   first.) On confirm, `splitPromptsLLM` runs (modal shows an "Extracting…"
+   state); on failure the modal closes and an inline error is shown.
+3. On success the extracted prompts populate **`SplitReview`**: an editable list
+   (edit / remove / add row) showing **"This will generate N images (N
    requests)"**, highlighted (red) when **N ≥ 12**.
 4. Confirm → `useGeneration` calls `generateBatch` (throttled, client-side, BYOK)
    → gallery renders one card per prompt, each captioned with its prompt;
@@ -190,11 +195,12 @@ export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";  // NEW
 
 ### CLI
 
-In `generateFlow`, after capturing the prompt text: run
-`splitPromptsHeuristic`. If `>1` → `note` the numbered list, then `confirm`
-"Generate these N as separate images? (N requests)". If `===1` → offer an "AI
-split" option in the model/flow menu that calls `splitPromptsLLM` and re-shows
-the list. On confirm → `generateBatch` → `saveSession({ kind: "batch", … })`.
+In `generateFlow`, after capturing the prompt text: `confirm` "Extract multiple
+prompts from this text using `<split model>`?" (defaults to no). On yes, a
+spinner runs `splitPromptsLLM`; the extracted prompts are listed via `note`, then
+`confirm` "Generate these N as separate images? (N requests)". On confirm →
+`generateBatch` → `saveSession({ kind: "batch", … })`. On extraction failure,
+`note` the error and fall through to the normal single-prompt variations flow.
 
 ## Settings: persisted split model
 
@@ -237,8 +243,9 @@ generations/
 
 - Per-prompt isolation via `Promise.allSettled` (existing): one failed prompt is
   flagged in its gallery card; the batch completes.
-- `splitPromptsLLM` failure → `SplitError`; UI/CLI surfaces a clear message and
-  leaves the user on the manual review list.
+- `splitPromptsLLM` failure → `SplitError`; the web closes the confirm modal and
+  shows an inline error, the CLI `note`s the error and falls through to the
+  single-prompt flow. The user can edit their text and retry.
 - Throttling reduces 429s; an individual 429 is still surfaced per-prompt
   (existing `errorForStatus`).
 - Large-batch cost: the total-request count is always shown pre-generation and
@@ -246,9 +253,9 @@ generations/
 
 ## Testing (Vitest, TDD)
 
-- **`split.test.ts`** — numbered lists, bullets, blank-line blocks, plain
-  newlines, marker stripping, single-block → `[input]`; `splitPromptsLLM` JSON
-  parse + defensive `SplitError` on bad output (mocked `fetch`).
+- **`split.test.ts`** — `splitPromptsLLM`: JSON-array parse, array extraction
+  from surrounding prose, default-model use, system+user message shape, defensive
+  `SplitError` on bad/non-ok output (mocked `fetch`); `batchLabel` formatting.
 - **`generate.test.ts`** — `generateBatch`: one request per prompt, distinct
   sequential seeds, per-image `prompt` attached, throttle respects max in-flight
   (assert peak concurrency ≤ N), partial success on one failure.
@@ -256,8 +263,9 @@ generations/
   into `metadata.json`; batch-label folder naming.
 - **`config.test.ts`** — `splitModel` round-trips; falls back to
   `DEFAULT_SPLIT_MODEL` when unset.
-- Web components (`SplitReview`) tested lightly: count display + warning
-  threshold, add/edit/remove rows.
+- Web components tested lightly: `SplitReview` (count display + warning
+  threshold, add/edit/remove rows) and `SplitConfirmModal` (model name shown,
+  confirm/cancel callbacks, loading disables actions).
 
 ## Defaults
 

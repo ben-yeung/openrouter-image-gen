@@ -1,47 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  splitPromptsHeuristic,
-  splitPromptsLLM,
-  batchLabel,
-  SplitError,
-} from "./split";
-
-describe("splitPromptsHeuristic", () => {
-  it("splits numbered lists and strips the markers", () => {
-    expect(splitPromptsHeuristic("1. a cat\n2. a dog\n3. a bird")).toEqual([
-      "a cat",
-      "a dog",
-      "a bird",
-    ]);
-  });
-
-  it("splits 1) and 1 - numbering too", () => {
-    expect(splitPromptsHeuristic("1) red car\n2) blue car")).toEqual(["red car", "blue car"]);
-  });
-
-  it("splits bullet lists", () => {
-    expect(splitPromptsHeuristic("- a cat\n- a dog")).toEqual(["a cat", "a dog"]);
-  });
-
-  it("splits blank-line-separated blocks", () => {
-    expect(splitPromptsHeuristic("a cat in space\n\na dog on the moon")).toEqual([
-      "a cat in space",
-      "a dog on the moon",
-    ]);
-  });
-
-  it("splits plain newline-separated lines", () => {
-    expect(splitPromptsHeuristic("a cat\na dog")).toEqual(["a cat", "a dog"]);
-  });
-
-  it("returns a single-element array for one prompt", () => {
-    expect(splitPromptsHeuristic("just one prompt please")).toEqual(["just one prompt please"]);
-  });
-
-  it("returns [] for empty input", () => {
-    expect(splitPromptsHeuristic("   ")).toEqual([]);
-  });
-});
+import { splitPromptsLLM, batchLabel, SplitError } from "./split";
 
 describe("batchLabel", () => {
   it("labels a multi-prompt batch with '+N more'", () => {
@@ -79,6 +37,15 @@ describe("splitPromptsLLM", () => {
     await splitPromptsLLM("a", { apiKey: "k" }, fetchImpl as unknown as typeof fetch);
     const body = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
     expect(body.model).toBe("google/gemini-3.1-flash");
+  });
+
+  it("sends a system instruction and the raw input as the user message", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(arrayResponse('["a"]'));
+    await splitPromptsLLM("my messy text", { apiKey: "k", model: "m" }, fetchImpl as unknown as typeof fetch);
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[0].content).toMatch(/Do NOT rewrite/);
+    expect(body.messages[1]).toEqual({ role: "user", content: "my messy text" });
   });
 
   it("throws SplitError on unparseable output", async () => {

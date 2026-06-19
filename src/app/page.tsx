@@ -10,17 +10,19 @@ import { PromptForm } from "./components/PromptForm";
 import { LoadingGrid } from "./components/LoadingGrid";
 import { Gallery } from "./components/Gallery";
 import { SplitReview } from "./components/SplitReview";
+import { SplitConfirmModal } from "./components/SplitConfirmModal";
 
 export default function Home() {
   const { apiKey, setApiKey } = useApiKey();
   const { images, loading, savedDir, error, run, runBatch } = useGeneration();
-  const { detect, aiSplit } = useSplit();
+  const { extract } = useSplit();
   const { splitModel, setSplitModel } = useSettings();
   const [showKey, setShowKey] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");
   const [count, setCount] = useState(4);
   const [splitList, setSplitList] = useState<string[] | null>(null);
+  const [showSplitConfirm, setShowSplitConfirm] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [splitError, setSplitError] = useState<string | null>(null);
 
@@ -29,21 +31,21 @@ export default function Home() {
     if (prompt.trim() && model) run({ apiKey, model, prompt: prompt.trim(), count });
   };
 
-  const detected = detect(prompt);
-  const canHeuristicSplit = detected.length > 1;
-
-  const openSplit = () => {
-    setSplitError(null);
-    setSplitList(detected);
-  };
-  const onAiSplit = async () => {
+  const openSplitConfirm = () => {
     if (!apiKey) return setShowKey(true);
+    setSplitError(null);
+    setShowSplitConfirm(true);
+  };
+  const runExtraction = async () => {
     setSplitting(true);
     setSplitError(null);
     try {
-      setSplitList(await aiSplit(prompt, apiKey, splitModel));
+      const prompts = await extract(prompt, apiKey, splitModel);
+      setSplitList(prompts);
+      setShowSplitConfirm(false);
     } catch (e) {
       setSplitError(e instanceof Error ? e.message : String(e));
+      setShowSplitConfirm(false);
     } finally {
       setSplitting(false);
     }
@@ -80,23 +82,13 @@ export default function Home() {
       {prompt.trim() && (
         <div className="mt-3 flex flex-col gap-2">
           <div className="flex gap-2">
-            {canHeuristicSplit ? (
-              <button
-                onClick={openSplit}
-                disabled={loading}
-                className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Scissors className="h-3.5 w-3.5" /> Split into {detected.length} prompts
-              </button>
-            ) : (
-              <button
-                onClick={onAiSplit}
-                disabled={loading || splitting}
-                className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Scissors className="h-3.5 w-3.5" /> {splitting ? "Splitting…" : "AI split"}
-              </button>
-            )}
+            <button
+              onClick={openSplitConfirm}
+              disabled={loading || splitting}
+              className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Scissors className="h-3.5 w-3.5" /> Split into separate prompts
+            </button>
           </div>
           {splitError && (
             <p className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
@@ -128,6 +120,15 @@ export default function Home() {
         )}
         {loading ? <LoadingGrid count={count} /> : <Gallery images={images} />}
       </section>
+
+      {showSplitConfirm && (
+        <SplitConfirmModal
+          model={splitModel}
+          loading={splitting}
+          onConfirm={runExtraction}
+          onCancel={() => setShowSplitConfirm(false)}
+        />
+      )}
 
       {showKey && (
         <ApiKeyDialog

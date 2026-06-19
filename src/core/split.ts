@@ -9,44 +9,6 @@ export class SplitError extends Error {
   }
 }
 
-/**
- * Pure, no network. Detect the distinct prompts in structured input.
- * First matching strategy wins; returns [input] when it looks like one prompt,
- * [] when empty.
- */
-export function splitPromptsHeuristic(input: string): string[] {
-  const text = input.trim();
-  if (!text) return [];
-  const lines = text.split(/\r?\n/);
-
-  // 1. Numbered items: "1." / "1)" / "1 -" / "1:"
-  const numbered = lines
-    .map((l) => l.match(/^\s*\d+\s*[.)\-:]\s+(.*\S)/))
-    .filter((m): m is RegExpMatchArray => m !== null)
-    .map((m) => m[1].trim());
-  if (numbered.length > 1) return numbered;
-
-  // 2. Bullets: "-" / "*" / "•"
-  const bullets = lines
-    .map((l) => l.match(/^\s*[-*•]\s+(.*\S)/))
-    .filter((m): m is RegExpMatchArray => m !== null)
-    .map((m) => m[1].trim());
-  if (bullets.length > 1) return bullets;
-
-  // 3. Blank-line-separated blocks
-  const blocks = text
-    .split(/\n\s*\n+/)
-    .map((b) => b.trim().replace(/\s+/g, " "))
-    .filter(Boolean);
-  if (blocks.length > 1) return blocks;
-
-  // 4. Plain non-empty lines
-  const plain = lines.map((l) => l.trim()).filter(Boolean);
-  if (plain.length > 1) return plain;
-
-  return [text];
-}
-
 /** Human-readable label for a batch: first prompt (truncated) + "+N more". */
 export function batchLabel(prompts: string[]): string {
   const first = prompts[0] ?? "batch";
@@ -70,7 +32,39 @@ function parseJsonArray(content: string | undefined): string[] | null {
   }
 }
 
-/** Network fallback: ask a cheap text model for a JSON array of prompts. */
+/**
+ * System instruction for the extraction model. Verbatim extraction only —
+ * the model identifies the distinct image prompts and returns them as written,
+ * without rewriting, merging, or injecting shared context.
+ */
+const SPLIT_SYSTEM_PROMPT = [
+  "You extract distinct image-generation prompts from a user's text for a batch image generator.",
+  "",
+  "The text may list several image requests using numbering, bullets, quotes, or plain sentences,",
+  "possibly mixed with commentary or instructions addressed to you. Identify each distinct image",
+  "the user wants generated.",
+  "",
+  "Return ONLY a JSON array of strings — no prose, no explanation, no markdown, no code fences.",
+  "",
+  "Guidelines:",
+  "- One array element per distinct image prompt, in the order they appear.",
+  "- Preserve each prompt's original wording. Do NOT rewrite, rephrase, translate, expand,",
+  "  summarize, improve, or combine prompts, and do NOT invent prompts that are not present.",
+  '- Light cleanup only: strip list markers (e.g. "1.", "2)", "-", "*"), surrounding quotation',
+  "  marks, and leading/trailing whitespace.",
+  "- Do NOT copy shared context (a common style, count, or instruction) into the individual",
+  "  prompts; keep each prompt's own text only.",
+  "- Exclude text that is not itself an image prompt: greetings, meta commentary, and instructions",
+  '  to you (e.g. "I have 10 prompts", "make them detailed").',
+  "- If the text describes only one image, return a single-element array.",
+  "- If you find no image prompts, return an empty array.",
+].join("\n");
+
+/**
+ * Ask the configured split model to extract the distinct image prompts from
+ * free-form text. This is the only splitting path — there is no heuristic
+ * fallback. Throws SplitError on request failure or unparseable output.
+ */
 export async function splitPromptsLLM(
   input: string,
   params: { apiKey: string; model?: string; signal?: AbortSignal },
@@ -88,13 +82,7 @@ export async function splitPromptsLLM(
       body: JSON.stringify({
         model,
         messages: [
-          {
-            role: "system",
-            content:
-              "Split the user's text into the distinct image prompts it contains. " +
-              "Return ONLY a JSON array of strings, one per prompt. " +
-              "Do not rewrite, summarize, merge, or add prompts.",
-          },
+          { role: "system", content: SPLIT_SYSTEM_PROMPT },
           { role: "user", content: input },
         ],
       }),
@@ -104,12 +92,12 @@ export async function splitPromptsLLM(
     throw new SplitError(e instanceof Error ? e.message : String(e));
   }
 
-  if (!res.ok) throw new SplitError(`AI split request failed (${res.status})`);
+  if (!res.ok) throw new SplitError(`Prompt extraction failed (${res.status})`);
   const data = await res.json();
   const content: string | undefined = data?.choices?.[0]?.message?.content;
   const prompts = parseJsonArray(content);
   if (!prompts || prompts.length === 0) {
-    throw new SplitError("AI split didn't work — try editing your prompts manually.");
+    throw new SplitError("Couldn't extract any prompts — try editing your text and retry.");
   }
   return prompts;
 }

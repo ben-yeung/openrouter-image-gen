@@ -6,7 +6,7 @@ import { loadKey, saveKey, loadSplitModel, saveSplitModel } from "./config.js";
 import { fetchImageModels, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
-import { splitPromptsHeuristic, splitPromptsLLM, batchLabel } from "../src/core/split.js";
+import { splitPromptsLLM, batchLabel } from "../src/core/split.js";
 
 function bail<T>(value: T): asserts value is Exclude<T, symbol> {
   if (isCancel(value)) {
@@ -51,29 +51,28 @@ async function generateFlow(apiKey: string) {
   }
   if (!prompt) { note("Empty prompt — skipping.", "Skip"); return; }
 
-  const parts = splitPromptsHeuristic(prompt);
   let prompts: string[] | null = null;
-
-  if (parts.length > 1) {
-    note(parts.map((p, i) => `${i + 1}. ${p}`).join("\n"), "Detected prompts");
-    const doSplit = await confirm({
-      message: `Generate these ${parts.length} as separate images? (${parts.length} requests)`,
-    });
-    bail(doSplit);
-    if (doSplit) prompts = parts;
-  } else {
-    const tryAi = await confirm({ message: "Try AI split into multiple prompts?" });
-    bail(tryAi);
-    if (tryAi) {
-      try {
-        const ai = await splitPromptsLLM(prompt, { apiKey, model: loadSplitModel() });
-        note(ai.map((p, i) => `${i + 1}. ${p}`).join("\n"), "AI-split prompts");
-        const ok = await confirm({ message: `Generate these ${ai.length} as separate images? (${ai.length} requests)` });
-        bail(ok);
-        if (ok) prompts = ai;
-      } catch (e) {
-        note((e as Error).message, "AI split failed");
-      }
+  const splitModel = loadSplitModel();
+  const trySplit = await confirm({
+    message: `Extract multiple prompts from this text using ${splitModel}?`,
+    initialValue: false,
+  });
+  bail(trySplit);
+  if (trySplit) {
+    const ss = spinner();
+    ss.start("Extracting prompts…");
+    try {
+      const extracted = await splitPromptsLLM(prompt, { apiKey, model: splitModel });
+      ss.stop(`Found ${extracted.length} prompt(s).`);
+      note(extracted.map((p, i) => `${i + 1}. ${p}`).join("\n"), "Extracted prompts");
+      const ok = await confirm({
+        message: `Generate these ${extracted.length} as separate images? (${extracted.length} requests)`,
+      });
+      bail(ok);
+      if (ok) prompts = extracted;
+    } catch (e) {
+      ss.stop("Extraction failed.");
+      note((e as Error).message, "Split failed");
     }
   }
 

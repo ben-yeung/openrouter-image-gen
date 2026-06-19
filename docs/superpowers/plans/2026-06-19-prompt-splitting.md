@@ -1,5 +1,12 @@
 # Prompt Splitting Implementation Plan
 
+> **Superseded in part (2026-06-19):** This plan was executed, then the splitting
+> approach was revised — the heuristic/newline splitter (`splitPromptsHeuristic`)
+> was removed in favor of **LLM-only** extraction triggered by an explicit
+> "Split into separate prompts" control + confirmation. Treat the heuristic
+> portions of Task 1, Task 6 (detection/affordance), and Task 7 (CLI detection)
+> as historical. See the spec's "Revision 2026-06-19" note for the current design.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an opt-in prompt-splitting layer that decomposes one structured multi-prompt input into N parallel single-image generations (a "batch"), reviewed/confirmed by the user before generating.
