@@ -15,7 +15,7 @@ export default function Home() {
   const { apiKey, setApiKey } = useApiKey();
   const { images, loading, savedDir, error, run, runBatch } = useGeneration();
   const { detect, aiSplit } = useSplit();
-  const { splitModel } = useSettings();
+  const { splitModel, setSplitModel } = useSettings();
   const [showKey, setShowKey] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");
@@ -50,6 +50,7 @@ export default function Home() {
   };
   const confirmSplit = () => {
     if (!apiKey) return setShowKey(true);
+    if (!model) return;
     const prompts = (splitList ?? []).map((p) => p.trim()).filter(Boolean);
     if (prompts.length === 0) return;
     setSplitList(null);
@@ -129,7 +130,13 @@ export default function Home() {
       </section>
 
       {showKey && (
-        <ApiKeyDialog initial={apiKey} onSave={setApiKey} onClose={() => setShowKey(false)} />
+        <ApiKeyDialog
+          initial={apiKey}
+          onSave={setApiKey}
+          onClose={() => setShowKey(false)}
+          splitModel={splitModel}
+          onSaveSplitModel={setSplitModel}
+        />
       )}
     </main>
   );

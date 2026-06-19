@@ -2,7 +2,7 @@ import {
   intro, outro, text, select, confirm, password, spinner, isCancel, cancel, note,
 } from "@clack/prompts";
 import clipboard from "clipboardy";
-import { loadKey, saveKey, loadSplitModel } from "./config.js";
+import { loadKey, saveKey, loadSplitModel, saveSplitModel } from "./config.js";
 import { fetchImageModels, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
@@ -135,12 +135,23 @@ async function main() {
       message: "What now?",
       options: [
         { value: "gen", label: "Generate images" },
+        { value: "splitmodel", label: "Change split model" },
         { value: "exit", label: "Exit" },
       ],
     });
     bail(action);
     if (action === "exit") break;
     if (action === "gen") await generateFlow(apiKey);
+    if (action === "splitmodel") {
+      note(loadSplitModel(), "Current split model");
+      const newModel = await text({ message: "New split model slug (leave blank to keep current):" });
+      bail(newModel);
+      const trimmed = (newModel as string).trim();
+      if (trimmed) {
+        saveSplitModel(trimmed);
+        note(trimmed, "Split model saved");
+      }
+    }
   }
 
   outro("Done.");

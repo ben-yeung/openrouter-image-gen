@@ -87,7 +87,7 @@ splitPromptsHeuristic(input: string): string[]
 // Parses defensively; throws SplitError on unparseable output.
 splitPromptsLLM(
   input: string,
-  params: { apiKey: string; model: string; signal?: AbortSignal },
+  params: { apiKey: string; model?: string; signal?: AbortSignal },
   fetchImpl?: typeof fetch,
 ): Promise<string[]>
 
