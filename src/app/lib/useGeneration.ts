@@ -34,10 +34,10 @@ export function useGeneration() {
           setError("Images generated but could not be saved to disk.");
         }
       } else {
-        setError(results[0]?.error ?? "No images were generated.");
+        setError(results[0]?.error || "No images were generated.");
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
