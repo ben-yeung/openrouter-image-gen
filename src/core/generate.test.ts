@@ -92,3 +92,61 @@ describe("generateVariations", () => {
     expect(imgs.filter((i) => i.error !== undefined)).toHaveLength(1);
   });
 });
+
+import { generateBatch } from "./generate";
+
+describe("generateBatch", () => {
+  const imageResponse = (url: string) => ({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: "ok", images: [{ image_url: { url } }] } }],
+    }),
+  });
+
+  it("fires one request per prompt with distinct seeds and attaches each prompt", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(imageResponse("data:image/png;base64,AAA"));
+    const imgs = await generateBatch(
+      ["a cat", "a dog", "a bird"],
+      { apiKey: "k", model: "m" },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, baseSeed: 100 },
+    );
+    expect(imgs).toHaveLength(3);
+    expect(imgs.map((i) => i.index)).toEqual([0, 1, 2]);
+    expect(imgs.map((i) => i.seed)).toEqual([100, 101, 102]);
+    expect(imgs.map((i) => i.prompt)).toEqual(["a cat", "a dog", "a bird"]);
+  });
+
+  it("never exceeds the configured concurrency", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const fetchImpl = vi.fn().mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return imageResponse("data:image/png;base64,AAA");
+    });
+    await generateBatch(
+      Array.from({ length: 12 }, (_, i) => `p${i}`),
+      { apiKey: "k", model: "m" },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, baseSeed: 0, concurrency: 5 },
+    );
+    expect(peak).toBeLessThanOrEqual(5);
+    expect(fetchImpl).toHaveBeenCalledTimes(12);
+  });
+
+  it("allows partial success and tags the failed prompt", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(imageResponse("data:image/png;base64,AAA"))
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) });
+    const imgs = await generateBatch(
+      ["good prompt", "bad prompt"],
+      { apiKey: "k", model: "m" },
+      { fetchImpl: fetchImpl as unknown as typeof fetch, baseSeed: 0, concurrency: 5 },
+    );
+    expect(imgs.filter((i) => i.dataUrl)).toHaveLength(1);
+    const failed = imgs.find((i) => i.error);
+    expect(failed?.prompt).toBe("bad prompt");
+  });
+});

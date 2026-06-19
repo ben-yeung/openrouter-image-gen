@@ -18,6 +18,7 @@ export interface GeneratedImage {
   index: number;
   dataUrl: string;   // "" when error is set
   seed?: number;
+  prompt?: string;   // the prompt that produced this image (batch mode)
   error?: string;
 }
 
