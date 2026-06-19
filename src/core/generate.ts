@@ -48,7 +48,7 @@ export async function generateImage(
     }
     return { index, seed: params.seed, dataUrl: url };
   } catch (e) {
-    return { ...base, error: (e as Error).message };
+    return { ...base, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

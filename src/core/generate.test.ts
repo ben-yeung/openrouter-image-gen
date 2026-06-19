@@ -52,6 +52,17 @@ describe("generateImage", () => {
     );
     expect(img.error).toMatch(/can't do that/);
   });
+
+  it("omits seed from the body when not provided", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(imageResponse("data:image/png;base64,AAA"));
+    await generateImage(
+      { apiKey: "k", model: "m", prompt: "p" },
+      fetchImpl as unknown as typeof fetch,
+    );
+    const [, init] = fetchImpl.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect("seed" in body).toBe(false);
+  });
 });
 
 describe("generateVariations", () => {
@@ -77,7 +88,7 @@ describe("generateVariations", () => {
       2,
       { fetchImpl: fetchImpl as unknown as typeof fetch, baseSeed: 0 },
     );
-    expect(imgs.filter((i) => i.dataUrl)).toHaveLength(1);
-    expect(imgs.filter((i) => i.error)).toHaveLength(1);
+    expect(imgs.filter((i) => i.dataUrl !== "")).toHaveLength(1);
+    expect(imgs.filter((i) => i.error !== undefined)).toHaveLength(1);
   });
 });
