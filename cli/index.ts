@@ -7,7 +7,7 @@ import { fetchImageModels, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
 
-function bail(value: unknown): asserts value {
+function bail<T>(value: T): asserts value is Exclude<T, symbol> {
   if (isCancel(value)) {
     cancel("Cancelled.");
     process.exit(0);
@@ -19,6 +19,10 @@ async function ensureKey(): Promise<string> {
   if (existing) return existing;
   const key = await password({ message: "OpenRouter API key:" });
   bail(key);
+  if (!key) {
+    cancel("API key cannot be empty.");
+    process.exit(1);
+  }
   const save = await confirm({ message: "Save this key for next time?" });
   bail(save);
   if (save) saveKey(key as string);
@@ -38,7 +42,7 @@ async function generateFlow(apiKey: string) {
   let prompt: string;
   if (source === "clip") {
     prompt = (await clipboard.read()).trim();
-    note(prompt || "(clipboard empty)", "Clipboard");
+    if (prompt) note(prompt, "Clipboard");
   } else {
     const typed = await text({ message: "Describe the image:" });
     bail(typed);
