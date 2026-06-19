@@ -5,3 +5,4 @@ generations/
 *.tsbuildinfo
 next-env.d.ts
 .openrouter-image-gen.json
+.claude/worktrees/
