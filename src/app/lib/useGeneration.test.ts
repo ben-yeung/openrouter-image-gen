@@ -58,8 +58,8 @@ describe("useGeneration reroll", () => {
   it("replaces only the rerolled slot; other slots are unchanged", async () => {
     const original = [img(0), img(1)];
     vi.mocked(generateVariations).mockResolvedValue(original);
-    const fresh = img(0, { seed: 999, dataUrl: "data:image/png;base64,NEW" });
-    vi.mocked(generateImage).mockResolvedValue(fresh);
+    const freshResult = img(0, { seed: 999, dataUrl: "data:image/png;base64,NEW" });
+    vi.mocked(generateImage).mockResolvedValue(freshResult);
 
     const { result } = renderHook(() => useGeneration());
     await act(async () => {
@@ -67,7 +67,8 @@ describe("useGeneration reroll", () => {
     });
     await act(async () => { await result.current.reroll(0); });
 
-    expect(result.current.images[0]).toEqual(fresh);
+    // After reroll, the image should have the generateImage result plus the prompt from lastParams
+    expect(result.current.images[0]).toEqual({ ...freshResult, prompt: "p" });
     expect(result.current.images[1]).toEqual(original[1]);
   });
 
@@ -76,7 +77,7 @@ describe("useGeneration reroll", () => {
       img(0, { prompt: "a cat" }),
       img(1, { prompt: "a dog" }),
     ]);
-    vi.mocked(generateImage).mockResolvedValue(img(1, { prompt: "a dog" }));
+    vi.mocked(generateImage).mockResolvedValue(img(1));
 
     const { result } = renderHook(() => useGeneration());
     await act(async () => {
@@ -87,6 +88,7 @@ describe("useGeneration reroll", () => {
     expect(vi.mocked(generateImage)).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "a dog", index: 1 }),
     );
+    expect(result.current.images[1].prompt).toBe("a dog");
   });
 
   it("clears the index from rerolling after the call resolves", async () => {

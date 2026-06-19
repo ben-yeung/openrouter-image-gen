@@ -102,7 +102,7 @@ export function useGeneration() {
         seed,
         index,
       });
-      setImages((prev) => prev.map((img, i) => (i === index ? result : img)));
+      setImages((prev) => prev.map((img, i) => (i === index ? { ...result, prompt } : img)));
     } finally {
       setRerolling((prev) => {
         const next = new Set(prev);
