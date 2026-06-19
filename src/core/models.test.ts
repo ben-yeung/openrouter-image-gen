@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fetchImageModels, isValidSlugFormat, mergeModels, TOP_MODELS } from "./models";
+import { fetchImageModels, fetchModelCatalog, isValidSlugFormat, mergeModels, TOP_MODELS } from "./models";
 
 describe("mergeModels", () => {
   it("puts curated first, then non-curated live models, deduped by id", () => {
@@ -42,6 +42,33 @@ describe("fetchImageModels", () => {
     const fakeFetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
     const models = await fetchImageModels(fakeFetch as unknown as typeof fetch);
     expect(models).toEqual(TOP_MODELS);
+  });
+});
+
+describe("fetchModelCatalog", () => {
+  it("returns image-filtered models plus the set of all ids", async () => {
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: "x/text-only", name: "T", architecture: { output_modalities: ["text"] } },
+          { id: "x/img", name: "Img", architecture: { output_modalities: ["image", "text"] } },
+        ],
+      }),
+    });
+    const { imageModels, allIds } = await fetchModelCatalog(fakeFetch as unknown as typeof fetch);
+    expect(imageModels.some((m) => m.id === "x/img")).toBe(true);
+    expect(imageModels.some((m) => m.id === "x/text-only")).toBe(false);
+    // allIds includes every id, including non-image models
+    expect(allIds.has("x/text-only")).toBe(true);
+    expect(allIds.has("x/img")).toBe(true);
+  });
+
+  it("falls back to TOP_MODELS with an empty id set on failure", async () => {
+    const fakeFetch = vi.fn().mockRejectedValue(new Error("network"));
+    const { imageModels, allIds } = await fetchModelCatalog(fakeFetch as unknown as typeof fetch);
+    expect(imageModels).toEqual(TOP_MODELS);
+    expect(allIds.size).toBe(0);
   });
 });
 

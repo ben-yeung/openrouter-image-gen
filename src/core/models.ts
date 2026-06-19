@@ -28,19 +28,29 @@ export function mergeModels(curated: ImageModel[], live: ImageModel[]): ImageMod
   return merged;
 }
 
-export async function fetchImageModels(fetchImpl: typeof fetch = fetch): Promise<ImageModel[]> {
-  try {
-    type RawModel = { id: string; name?: string; architecture?: { output_modalities?: string[] } };
+export interface ModelCatalog {
+  imageModels: ImageModel[];
+  allIds: Set<string>;
+}
 
+type RawModel = { id: string; name?: string; architecture?: { output_modalities?: string[] } };
+
+export async function fetchModelCatalog(fetchImpl: typeof fetch = fetch): Promise<ModelCatalog> {
+  try {
     const res = await fetchImpl(MODELS_URL);
-    if (!res.ok) return TOP_MODELS;
+    if (!res.ok) return { imageModels: TOP_MODELS, allIds: new Set() };
     const data = await res.json();
     const raw = (data?.data ?? []) as RawModel[];
+    const allIds = new Set(raw.map((m) => m.id));
     const live: ImageModel[] = raw
       .filter((m) => (m?.architecture?.output_modalities ?? []).includes("image"))
       .map((m) => ({ id: m.id, name: m.name ?? m.id, curated: false }));
-    return mergeModels(TOP_MODELS, live);
+    return { imageModels: mergeModels(TOP_MODELS, live), allIds };
   } catch {
-    return TOP_MODELS;
+    return { imageModels: TOP_MODELS, allIds: new Set() };
   }
+}
+
+export async function fetchImageModels(fetchImpl: typeof fetch = fetch): Promise<ImageModel[]> {
+  return (await fetchModelCatalog(fetchImpl)).imageModels;
 }
