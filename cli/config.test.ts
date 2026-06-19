@@ -32,3 +32,24 @@ describe("cli config", () => {
     expect(loadKey()).toBeNull();
   });
 });
+
+describe("cli split model config", () => {
+  it("defaults to DEFAULT_SPLIT_MODEL when unset", async () => {
+    const { loadSplitModel } = await import("./config");
+    const { DEFAULT_SPLIT_MODEL } = await import("../src/core/types");
+    expect(loadSplitModel()).toBe(DEFAULT_SPLIT_MODEL);
+  });
+
+  it("round-trips a saved split model alongside the key", async () => {
+    const { saveKey, saveSplitModel, loadSplitModel, loadKey } = await import("./config");
+    saveKey("file-key");
+    saveSplitModel("openai/gpt-5-mini");
+    expect(loadSplitModel()).toBe("openai/gpt-5-mini");
+    expect(loadKey()).toBe("file-key"); // saving the model must not clobber the key
+
+    // Reverse direction: saving the key after the model must not clobber the model
+    saveKey("file-key-updated");
+    expect(loadSplitModel()).toBe("openai/gpt-5-mini");
+    expect(loadKey()).toBe("file-key-updated");
+  });
+});

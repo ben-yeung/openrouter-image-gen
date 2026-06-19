@@ -12,16 +12,21 @@ export function ImageCard({ image }: { image: GeneratedImage }) {
     );
   }
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-neutral-800">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.dataUrl} alt={`Generated image ${image.index + 1}`} className="aspect-square w-full object-cover" />
-      <a
-        href={image.dataUrl}
-        download={`image-${image.index + 1}.png`}
-        className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-xs opacity-0 transition group-hover:opacity-100"
-      >
-        <Download className="h-3.5 w-3.5" /> Save
-      </a>
+    <div className="group overflow-hidden rounded-xl border border-neutral-800">
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image.dataUrl} alt={`Generated image ${image.index + 1}`} className="aspect-square w-full object-cover" />
+        <a
+          href={image.dataUrl}
+          download={`image-${image.index + 1}.png`}
+          className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-xs opacity-0 transition group-hover:opacity-100"
+        >
+          <Download className="h-3.5 w-3.5" /> Save
+        </a>
+      </div>
+      {image.prompt && (
+        <p className="line-clamp-2 px-2 py-1.5 text-xs text-neutral-400">{image.prompt}</p>
+      )}
     </div>
   );
 }

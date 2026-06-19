@@ -18,14 +18,18 @@ export interface GeneratedImage {
   index: number;
   dataUrl: string;   // "" when error is set
   seed?: number;
+  prompt?: string;   // the prompt that produced this image (batch mode)
   error?: string;
 }
 
 export interface Session {
   sessionId: string;
-  prompt: string;
+  prompt: string;            // batch label when kind === "batch"
   model: string;
   count: number;
-  createdAt: string; // ISO
-  images: { file: string; seed?: number }[];
+  createdAt: string;         // ISO
+  kind: "variations" | "batch";
+  images: { file: string; seed?: number; prompt?: string }[];
 }
+
+export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";

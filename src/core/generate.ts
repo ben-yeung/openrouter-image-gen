@@ -69,3 +69,47 @@ export async function generateVariations(
       : { index: i, seed: baseSeed + i, dataUrl: "", error: String(r.reason) },
   );
 }
+
+/** Run thunks with bounded concurrency, preserving allSettled semantics. */
+async function runThrottled<T>(
+  thunks: Array<() => Promise<T>>,
+  concurrency: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(thunks.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < thunks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await thunks[i]() };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  }
+  const poolSize = Math.max(1, Math.min(concurrency, thunks.length));
+  await Promise.all(Array.from({ length: poolSize }, () => worker()));
+  return results;
+}
+
+/** One image per prompt, distinct seeds, throttled. Partial success allowed. */
+export async function generateBatch(
+  prompts: string[],
+  params: Omit<GenerateParams, "prompt" | "seed" | "index">,
+  opts: { fetchImpl?: typeof fetch; baseSeed?: number; concurrency?: number } = {},
+): Promise<GeneratedImage[]> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const baseSeed = opts.baseSeed ?? Math.floor(Math.random() * 1_000_000_000);
+  const concurrency = Math.max(5, Math.min(10, opts.concurrency ?? 6));
+
+  const thunks = prompts.map((prompt, i) => () =>
+    generateImage({ ...params, prompt, seed: baseSeed + i, index: i }, fetchImpl),
+  );
+  const settled = await runThrottled(thunks, concurrency);
+
+  return settled.map((r, i) =>
+    r.status === "fulfilled"
+      ? { ...r.value, prompt: prompts[i] }
+      : { index: i, seed: baseSeed + i, dataUrl: "", prompt: prompts[i], error: String(r.reason) },
+  );
+}

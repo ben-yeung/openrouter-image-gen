@@ -7,6 +7,7 @@ export async function saveSession(input: {
   prompt: string;
   model: string;
   images: GeneratedImage[];
+  kind?: "variations" | "batch";
   rootDir?: string;
   now?: Date;
 }): Promise<{ dir: string; session: Session }> {
@@ -24,7 +25,7 @@ export async function saveSession(input: {
     // All dataUrls produced by generate.ts are base64-encoded PNG data URLs.
     const base64 = img.dataUrl.replace(/^data:image\/\w+;base64,/, "");
     await fs.writeFile(path.join(dir, file), Buffer.from(base64, "base64"));
-    images.push({ file, seed: img.seed });
+    images.push({ file, seed: img.seed, ...(img.prompt ? { prompt: img.prompt } : {}) });
     n++;
   }
 
@@ -34,6 +35,7 @@ export async function saveSession(input: {
     model: input.model,
     count: images.length,
     createdAt: now.toISOString(),
+    kind: input.kind ?? "variations",
     images,
   };
   await fs.writeFile(path.join(dir, "metadata.json"), JSON.stringify(session, null, 2));

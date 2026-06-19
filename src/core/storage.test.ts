@@ -63,3 +63,39 @@ describe("saveSession", () => {
     expect(session.count).toBe(1);
   });
 });
+
+describe("saveSession (batch)", () => {
+  it("records kind=batch and each image's prompt", async () => {
+    const b64 = Buffer.from("img").toString("base64");
+    const { dir, session } = await saveSession({
+      prompt: "a cat +1 more",
+      model: "m",
+      kind: "batch",
+      images: [
+        { index: 0, dataUrl: `data:image/png;base64,${b64}`, seed: 1, prompt: "a cat" },
+        { index: 1, dataUrl: `data:image/png;base64,${b64}`, seed: 2, prompt: "a dog" },
+      ],
+      rootDir: root,
+    });
+    expect(session.kind).toBe("batch");
+    expect(session.images).toEqual([
+      { file: "01.png", seed: 1, prompt: "a cat" },
+      { file: "02.png", seed: 2, prompt: "a dog" },
+    ]);
+    const meta = JSON.parse(await fs.readFile(path.join(dir, "metadata.json"), "utf8"));
+    expect(meta.kind).toBe("batch");
+    expect(meta.images[1].prompt).toBe("a dog");
+  });
+
+  it("defaults kind to variations and omits prompt when absent", async () => {
+    const b64 = Buffer.from("img").toString("base64");
+    const { session } = await saveSession({
+      prompt: "a cat",
+      model: "m",
+      images: [{ index: 0, dataUrl: `data:image/png;base64,${b64}`, seed: 1 }],
+      rootDir: root,
+    });
+    expect(session.kind).toBe("variations");
+    expect(session.images[0]).toEqual({ file: "01.png", seed: 1 });
+  });
+});
