@@ -2,10 +2,11 @@ import {
   intro, outro, text, select, confirm, password, spinner, isCancel, cancel, note,
 } from "@clack/prompts";
 import clipboard from "clipboardy";
-import { loadKey, saveKey } from "./config.js";
+import { loadKey, saveKey, loadSplitModel } from "./config.js";
 import { fetchImageModels, TOP_MODELS } from "../src/core/models.js";
-import { generateVariations } from "../src/core/generate.js";
+import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
+import { splitPromptsHeuristic, splitPromptsLLM, batchLabel } from "../src/core/split.js";
 
 function bail<T>(value: T): asserts value is Exclude<T, symbol> {
   if (isCancel(value)) {
@@ -50,6 +51,32 @@ async function generateFlow(apiKey: string) {
   }
   if (!prompt) { note("Empty prompt — skipping.", "Skip"); return; }
 
+  const parts = splitPromptsHeuristic(prompt);
+  let prompts: string[] | null = null;
+
+  if (parts.length > 1) {
+    note(parts.map((p, i) => `${i + 1}. ${p}`).join("\n"), "Detected prompts");
+    const doSplit = await confirm({
+      message: `Generate these ${parts.length} as separate images? (${parts.length} requests)`,
+    });
+    bail(doSplit);
+    if (doSplit) prompts = parts;
+  } else {
+    const tryAi = await confirm({ message: "Try AI split into multiple prompts?" });
+    bail(tryAi);
+    if (tryAi) {
+      try {
+        const ai = await splitPromptsLLM(prompt, { apiKey, model: loadSplitModel() });
+        note(ai.map((p, i) => `${i + 1}. ${p}`).join("\n"), "AI-split prompts");
+        const ok = await confirm({ message: `Generate these ${ai.length} as separate images? (${ai.length} requests)` });
+        bail(ok);
+        if (ok) prompts = ai;
+      } catch (e) {
+        note((e as Error).message, "AI split failed");
+      }
+    }
+  }
+
   const models = await fetchImageModels().catch(() => TOP_MODELS);
   const model = await select({
     message: "Model:",
@@ -65,6 +92,20 @@ async function generateFlow(apiKey: string) {
     const slug = await text({ message: "Custom model slug:" });
     bail(slug);
     modelId = (slug as string).trim();
+  }
+
+  if (prompts) {
+    const s2 = spinner();
+    s2.start(`Generating ${prompts.length} image(s)…`);
+    const images = await generateBatch(prompts, { apiKey, model: modelId });
+    const ok = images.filter((i) => i.dataUrl && !i.error);
+    s2.stop(`Generated ${ok.length}/${prompts.length}.`);
+    const failed = images.filter((i) => i.error);
+    if (failed.length) note(failed.map((f) => `#${f.index + 1}: ${f.error}`).join("\n"), "Errors");
+    if (ok.length === 0) return;
+    const { dir } = await saveSession({ prompt: batchLabel(prompts), model: modelId, kind: "batch", images });
+    note(dir, "Saved");
+    return;
   }
 
   const countRaw = await text({ message: "Variations (1-8):", initialValue: "4" });
