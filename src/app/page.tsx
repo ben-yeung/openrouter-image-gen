@@ -62,7 +62,7 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Image Gen</h1>
+        <h1 className="text-xl font-semibold tracking-tight">OpenRouter Image Gen Helper</h1>
         <button
           onClick={() => setShowKey(true)}
           className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-1.5 text-sm hover:bg-neutral-800"
