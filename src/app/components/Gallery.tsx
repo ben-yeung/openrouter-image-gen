@@ -5,7 +5,15 @@ import type { GeneratedImage } from "@/core";
 import { ImageCard } from "./ImageCard";
 import { Lightbox } from "./Lightbox";
 
-export function Gallery({ images }: { images: GeneratedImage[] }) {
+export function Gallery({
+  images,
+  onReroll,
+  rerolling,
+}: {
+  images: GeneratedImage[];
+  onReroll?: (index: number) => void;
+  rerolling?: Set<number>;
+}) {
   const ok = images.filter((i) => i.dataUrl && !i.error);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -39,6 +47,8 @@ export function Gallery({ images }: { images: GeneratedImage[] }) {
             key={img.index}
             image={img}
             onOpen={img.dataUrl && !img.error ? () => setSelected(ok.indexOf(img)) : undefined}
+            onReroll={onReroll}
+            rerolling={rerolling}
           />
         ))}
       </div>

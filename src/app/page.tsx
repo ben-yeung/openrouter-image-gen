@@ -14,7 +14,7 @@ import { SplitConfirmModal } from "./components/SplitConfirmModal";
 
 export default function Home() {
   const { apiKey, setApiKey } = useApiKey();
-  const { images, loading, savedDir, error, run, runBatch } = useGeneration();
+  const { images, loading, savedDir, error, rerolling, run, runBatch, reroll } = useGeneration();
   const { extract } = useSplit();
   const { splitModel, setSplitModel } = useSettings();
   const [showKey, setShowKey] = useState(false);
@@ -116,7 +116,7 @@ export default function Home() {
         {savedDir && (
           <p className="mb-4 text-xs text-neutral-500">Saved to {savedDir}</p>
         )}
-        {loading ? <LoadingGrid count={count} /> : <Gallery images={images} />}
+        {loading ? <LoadingGrid count={count} /> : <Gallery images={images} onReroll={reroll} rerolling={rerolling} />}
       </section>
 
       {showSplitConfirm && (
