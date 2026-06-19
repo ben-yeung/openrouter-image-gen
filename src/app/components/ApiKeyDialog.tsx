@@ -22,6 +22,7 @@ export function ApiKeyDialog({
           type="password"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { onSave(value.trim()); onClose(); } }}
           placeholder="sk-or-..."
           className="mb-4 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />

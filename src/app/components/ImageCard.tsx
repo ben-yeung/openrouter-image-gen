@@ -14,7 +14,7 @@ export function ImageCard({ image }: { image: GeneratedImage }) {
   return (
     <div className="group relative overflow-hidden rounded-xl border border-neutral-800">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.dataUrl} alt="" className="aspect-square w-full object-cover" />
+      <img src={image.dataUrl} alt={`Generated image ${image.index + 1}`} className="aspect-square w-full object-cover" />
       <a
         href={image.dataUrl}
         download={`image-${image.index + 1}.png`}

@@ -39,7 +39,7 @@ export function ModelSelect({
         />
         <button
           type="button"
-          onClick={() => custom.trim() && onChange(custom.trim())}
+          onClick={() => { const s = custom.trim(); if (s) { onChange(s); setCustom(""); } }}
           className="rounded-lg border border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-800"
         >
           Use
