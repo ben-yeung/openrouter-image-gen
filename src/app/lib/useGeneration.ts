@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { generateVariations, type GeneratedImage } from "@/core";
+import { generateVariations, generateBatch, batchLabel, type GeneratedImage } from "@/core";
 
 export function useGeneration() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
@@ -43,5 +43,45 @@ export function useGeneration() {
     }
   }
 
-  return { images, loading, savedDir, error, run };
+  async function runBatch(args: { apiKey: string; model: string; prompts: string[] }) {
+    setLoading(true);
+    setError(null);
+    setSavedDir(null);
+    setImages([]);
+    try {
+      const results = await generateBatch(args.prompts, {
+        apiKey: args.apiKey,
+        model: args.model,
+      });
+      setImages(results);
+
+      const successful = results.filter((r) => r.dataUrl && !r.error);
+      if (successful.length > 0) {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: batchLabel(args.prompts),
+            model: args.model,
+            kind: "batch",
+            images: successful,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setSavedDir(json.dir);
+        } else {
+          setError("Images generated but could not be saved to disk.");
+        }
+      } else {
+        setError(results[0]?.error ?? "No images were generated.");
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return { images, loading, savedDir, error, run, runBatch };
 }

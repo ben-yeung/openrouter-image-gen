@@ -1,24 +1,56 @@
 "use client";
 import { useState } from "react";
-import { Settings, KeyRound } from "lucide-react";
+import { Settings, KeyRound, Scissors } from "lucide-react";
 import { useApiKey } from "./lib/useApiKey";
 import { useGeneration } from "./lib/useGeneration";
+import { useSplit } from "./lib/useSplit";
+import { useSettings } from "./lib/useSettings";
 import { ApiKeyDialog } from "./components/ApiKeyDialog";
 import { PromptForm } from "./components/PromptForm";
 import { LoadingGrid } from "./components/LoadingGrid";
 import { Gallery } from "./components/Gallery";
+import { SplitReview } from "./components/SplitReview";
 
 export default function Home() {
   const { apiKey, setApiKey } = useApiKey();
-  const { images, loading, savedDir, error, run } = useGeneration();
+  const { images, loading, savedDir, error, run, runBatch } = useGeneration();
+  const { detect, aiSplit } = useSplit();
+  const { splitModel } = useSettings();
   const [showKey, setShowKey] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");
   const [count, setCount] = useState(4);
+  const [splitList, setSplitList] = useState<string[] | null>(null);
+  const [splitting, setSplitting] = useState(false);
 
   const onGenerate = () => {
     if (!apiKey) return setShowKey(true);
     if (prompt.trim() && model) run({ apiKey, model, prompt: prompt.trim(), count });
+  };
+
+  const detected = detect(prompt);
+  const canHeuristicSplit = detected.length > 1;
+
+  const openSplit = () => setSplitList(detected);
+  const onAiSplit = async () => {
+    if (!apiKey) return setShowKey(true);
+    setSplitting(true);
+    try {
+      setSplitList(await aiSplit(prompt, apiKey, splitModel));
+    } catch (e) {
+      // SplitError or network — surface via the existing error channel is fine;
+      // here we just keep the user on the manual editor with the raw prompt.
+      setSplitList([prompt]);
+    } finally {
+      setSplitting(false);
+    }
+  };
+  const confirmSplit = () => {
+    if (!apiKey) return setShowKey(true);
+    const prompts = (splitList ?? []).map((p) => p.trim()).filter(Boolean);
+    if (prompts.length === 0) return;
+    setSplitList(null);
+    runBatch({ apiKey, model, prompts });
   };
 
   return (
@@ -40,6 +72,38 @@ export default function Home() {
         count={count} setCount={setCount}
         disabled={loading} onGenerate={onGenerate}
       />
+
+      {prompt.trim() && (
+        <div className="mt-3 flex gap-2">
+          {canHeuristicSplit ? (
+            <button
+              onClick={openSplit}
+              className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800"
+            >
+              <Scissors className="h-3.5 w-3.5" /> Split into {detected.length} prompts
+            </button>
+          ) : (
+            <button
+              onClick={onAiSplit}
+              disabled={splitting}
+              className="flex items-center gap-2 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-800 disabled:opacity-40"
+            >
+              <Scissors className="h-3.5 w-3.5" /> {splitting ? "Splitting…" : "AI split"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {splitList && (
+        <div className="mt-4">
+          <SplitReview
+            prompts={splitList}
+            onChange={setSplitList}
+            onConfirm={confirmSplit}
+            onCancel={() => setSplitList(null)}
+          />
+        </div>
+      )}
 
       <section className="mt-8">
         {error && (
