@@ -29,3 +29,5 @@ export interface Session {
   createdAt: string; // ISO
   images: { file: string; seed?: number }[];
 }
+
+export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";
