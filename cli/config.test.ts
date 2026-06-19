@@ -46,5 +46,10 @@ describe("cli split model config", () => {
     saveSplitModel("openai/gpt-5-mini");
     expect(loadSplitModel()).toBe("openai/gpt-5-mini");
     expect(loadKey()).toBe("file-key"); // saving the model must not clobber the key
+
+    // Reverse direction: saving the key after the model must not clobber the model
+    saveKey("file-key-updated");
+    expect(loadSplitModel()).toBe("openai/gpt-5-mini");
+    expect(loadKey()).toBe("file-key-updated");
   });
 });
