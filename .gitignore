@@ -1,0 +1,7 @@
+node_modules/
+.next/
+generations/
+.env*
+*.tsbuildinfo
+next-env.d.ts
+.openrouter-image-gen.json
