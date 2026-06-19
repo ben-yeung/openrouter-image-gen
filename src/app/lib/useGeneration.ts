@@ -77,7 +77,7 @@ export function useGeneration() {
         setError(results[0]?.error ?? "No images were generated.");
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
