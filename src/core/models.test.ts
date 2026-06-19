@@ -29,6 +29,7 @@ describe("fetchImageModels", () => {
     const models = await fetchImageModels(fakeFetch as unknown as typeof fetch);
     expect(models.some((m) => m.id === "x/img")).toBe(true);
     expect(models.some((m) => m.id === "x/text-only")).toBe(false);
+    expect(models.some((m) => m.id === TOP_MODELS[0].id)).toBe(true);
   });
 
   it("falls back to TOP_MODELS on fetch failure", async () => {

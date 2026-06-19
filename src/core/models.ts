@@ -24,12 +24,15 @@ export function mergeModels(curated: ImageModel[], live: ImageModel[]): ImageMod
 
 export async function fetchImageModels(fetchImpl: typeof fetch = fetch): Promise<ImageModel[]> {
   try {
+    type RawModel = { id: string; name?: string; architecture?: { output_modalities?: string[] } };
+
     const res = await fetchImpl(MODELS_URL);
     if (!res.ok) return TOP_MODELS;
     const data = await res.json();
-    const live: ImageModel[] = (data?.data ?? [])
-      .filter((m: any) => (m?.architecture?.output_modalities ?? []).includes("image"))
-      .map((m: any) => ({ id: m.id as string, name: (m.name ?? m.id) as string, curated: false }));
+    const raw = (data?.data ?? []) as RawModel[];
+    const live: ImageModel[] = raw
+      .filter((m) => (m?.architecture?.output_modalities ?? []).includes("image"))
+      .map((m) => ({ id: m.id, name: m.name ?? m.id, curated: false }));
     return mergeModels(TOP_MODELS, live);
   } catch {
     return TOP_MODELS;
