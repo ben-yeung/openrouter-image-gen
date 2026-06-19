@@ -94,19 +94,22 @@ export function useGeneration() {
     const prompt = image.prompt ?? lastParams.prompt;
     const seed = Math.floor(Math.random() * 1_000_000_000);
     setRerolling((prev) => new Set(prev).add(index));
-    const result = await generateImage({
-      apiKey: lastParams.apiKey,
-      model: lastParams.model,
-      prompt,
-      seed,
-      index,
-    });
-    setImages((prev) => prev.map((img, i) => (i === index ? result : img)));
-    setRerolling((prev) => {
-      const next = new Set(prev);
-      next.delete(index);
-      return next;
-    });
+    try {
+      const result = await generateImage({
+        apiKey: lastParams.apiKey,
+        model: lastParams.model,
+        prompt,
+        seed,
+        index,
+      });
+      setImages((prev) => prev.map((img, i) => (i === index ? result : img)));
+    } finally {
+      setRerolling((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    }
   }
 
   return { images, loading, savedDir, error, rerolling, run, runBatch, reroll };
