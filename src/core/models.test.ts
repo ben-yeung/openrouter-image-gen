@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fetchImageModels, mergeModels, TOP_MODELS } from "./models";
+import { fetchImageModels, isValidSlugFormat, mergeModels, TOP_MODELS } from "./models";
 
 describe("mergeModels", () => {
   it("puts curated first, then non-curated live models, deduped by id", () => {
@@ -42,5 +42,34 @@ describe("fetchImageModels", () => {
     const fakeFetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
     const models = await fetchImageModels(fakeFetch as unknown as typeof fetch);
     expect(models).toEqual(TOP_MODELS);
+  });
+});
+
+describe("isValidSlugFormat", () => {
+  it("accepts well-formed slugs", () => {
+    for (const s of [
+      "a/b",
+      "google/gemini-3.1-flash-image-preview",
+      "black-forest-labs/flux-1.1-pro",
+      "author/model.name",
+      "a/b:free",
+    ]) {
+      expect(isValidSlugFormat(s)).toBe(true);
+    }
+  });
+
+  it("rejects malformed slugs", () => {
+    for (const s of [
+      "",
+      "noslash",
+      "a/b/c",
+      "/b",
+      "a/",
+      "a b/c",
+      "a/b:",
+      "a/b:c:d",
+    ]) {
+      expect(isValidSlugFormat(s)).toBe(false);
+    }
   });
 });

@@ -1,5 +1,11 @@
 import type { ImageModel } from "./types";
 
+const SLUG_RE = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(:[a-zA-Z0-9._-]+)?$/;
+
+export function isValidSlugFormat(slug: string): boolean {
+  return SLUG_RE.test(slug);
+}
+
 export const TOP_MODELS: ImageModel[] = [
   { id: "google/gemini-3.1-flash-image-preview", name: "Nano Banana 2", curated: true },
   { id: "google/gemini-3-pro-image-preview", name: "Nano Banana Pro", curated: true },
