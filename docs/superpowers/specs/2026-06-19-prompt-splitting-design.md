@@ -57,7 +57,7 @@ review/confirm step is the safety net for any mis-split.
 | Storage | **One flat batch folder**; each image's prompt recorded in `metadata.json` |
 | Concurrency | Throttle 5–10 in-flight (default 6); no hard cap |
 | Cost guard | Always show total request count; highlight when N ≥ 12 |
-| Split model | Default `google/gemini-3.1-flash`; persisted + user-editable |
+| Split model | Default `google/gemini-3.1-flash-lite-20260507`; persisted + user-editable |
 
 ## Architecture
 
@@ -160,7 +160,7 @@ interface Session {
   images: { file: string; seed?: number; prompt?: string }[];  // + prompt
 }
 
-export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";  // NEW
+export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash-lite-20260507";  // NEW
 ```
 
 ### `storage.ts`
@@ -204,7 +204,8 @@ spinner runs `splitPromptsLLM`; the extracted prompts are listed via `note`, the
 
 ## Settings: persisted split model
 
-- Constant default `DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash"`.
+- Constant default `DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash-lite-20260507"`
+  (must be a valid OpenRouter model id; verified against the live catalog).
 - **Web:** stored in `localStorage` (key `openrouter_split_model`) via a small
   `useSettings` hook (or an extension of `useApiKey`); editable in the existing
   settings/key dialog.
@@ -269,7 +270,7 @@ generations/
 
 ## Defaults
 
-- Split model: **`google/gemini-3.1-flash`** (persisted, editable).
+- Split model: **`google/gemini-3.1-flash-lite-20260507`** (persisted, editable).
 - Concurrency: **6** in-flight (clamp 5–10).
 - Large-batch warning threshold: **N ≥ 12**.
 - Batch size: **no hard cap** (count display + warning is the guard).

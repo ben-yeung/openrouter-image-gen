@@ -50,7 +50,7 @@ export function ApiKeyDialog({
           value={modelValue}
           onChange={(e) => setModelValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-          placeholder="google/gemini-3.1-flash"
+          placeholder="google/gemini-3.1-flash-lite-20260507"
           className="mb-4 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />
         <button

@@ -92,7 +92,17 @@ export async function splitPromptsLLM(
     throw new SplitError(e instanceof Error ? e.message : String(e));
   }
 
-  if (!res.ok) throw new SplitError(`Prompt extraction failed (${res.status})`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const errBody = await res.json();
+      const msg = errBody?.error?.message ?? errBody?.message;
+      if (typeof msg === "string" && msg.trim()) detail = `: ${msg.trim()}`;
+    } catch {
+      // body wasn't JSON — fall back to the bare status
+    }
+    throw new SplitError(`Prompt extraction failed (${res.status})${detail}`);
+  }
   const data = await res.json();
   const content: string | undefined = data?.choices?.[0]?.message?.content;
   const prompts = parseJsonArray(content);

@@ -32,4 +32,7 @@ export interface Session {
   images: { file: string; seed?: number; prompt?: string }[];
 }
 
-export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash";
+// Cheap, low-latency text model used to extract individual prompts. Must be a
+// valid OpenRouter model id (verified present in the live catalog). User-editable
+// in settings, so a future deprecation can be worked around without a code change.
+export const DEFAULT_SPLIT_MODEL = "google/gemini-3.1-flash-lite-20260507";

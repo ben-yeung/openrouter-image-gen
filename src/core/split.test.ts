@@ -36,7 +36,18 @@ describe("splitPromptsLLM", () => {
     const fetchImpl = vi.fn().mockResolvedValue(arrayResponse('["a"]'));
     await splitPromptsLLM("a", { apiKey: "k" }, fetchImpl as unknown as typeof fetch);
     const body = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
-    expect(body.model).toBe("google/gemini-3.1-flash");
+    expect(body.model).toBe("google/gemini-3.1-flash-lite-20260507");
+  });
+
+  it("surfaces the OpenRouter error message on a failed response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: "google/foo is not a valid model ID" } }),
+    });
+    await expect(
+      splitPromptsLLM("x", { apiKey: "k" }, fetchImpl as unknown as typeof fetch),
+    ).rejects.toThrow(/not a valid model ID/);
   });
 
   it("sends a system instruction and the raw input as the user message", async () => {
