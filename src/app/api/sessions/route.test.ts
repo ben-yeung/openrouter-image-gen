@@ -5,6 +5,7 @@ import path from "node:path";
 
 let root: string;
 beforeEach(async () => {
+  vi.resetModules();
   root = await fs.mkdtemp(path.join(os.tmpdir(), "imggen-route-"));
   vi.spyOn(process, "cwd").mockReturnValue(root);
 });
@@ -40,5 +41,7 @@ describe("POST /api/sessions", () => {
     });
     const res = await POST(req as any);
     expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBeTruthy();
   });
 });
