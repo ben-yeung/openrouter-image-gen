@@ -6,6 +6,20 @@ export function isValidSlugFormat(slug: string): boolean {
   return SLUG_RE.test(slug);
 }
 
+export type SlugStatus = "idle" | "invalid" | "valid";
+
+export function evaluateSlug(
+  draft: string,
+  allIds: Set<string>,
+  hasCatalog: boolean,
+): { status: SlugStatus; commit: boolean } {
+  if (!draft) return { status: "idle", commit: false };
+  if (!isValidSlugFormat(draft)) return { status: "invalid", commit: false };
+  if (!hasCatalog) return { status: "valid", commit: true };
+  if (allIds.has(draft)) return { status: "valid", commit: true };
+  return { status: "invalid", commit: false };
+}
+
 export const TOP_MODELS: ImageModel[] = [
   { id: "google/gemini-3.1-flash-image-preview", name: "Nano Banana 2", curated: true },
   { id: "google/gemini-3-pro-image-preview", name: "Nano Banana Pro", curated: true },

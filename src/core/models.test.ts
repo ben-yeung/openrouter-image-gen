@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fetchImageModels, fetchModelCatalog, isValidSlugFormat, mergeModels, TOP_MODELS } from "./models";
+import { evaluateSlug, fetchImageModels, fetchModelCatalog, isValidSlugFormat, mergeModels, TOP_MODELS } from "./models";
 
 describe("mergeModels", () => {
   it("puts curated first, then non-curated live models, deduped by id", () => {
@@ -98,5 +98,29 @@ describe("isValidSlugFormat", () => {
     ]) {
       expect(isValidSlugFormat(s)).toBe(false);
     }
+  });
+});
+
+describe("evaluateSlug", () => {
+  const ids = new Set(["author/known"]);
+
+  it("is idle on empty input", () => {
+    expect(evaluateSlug("", ids, true)).toEqual({ status: "idle", commit: false });
+  });
+
+  it("is invalid (no commit) on bad format", () => {
+    expect(evaluateSlug("noslash", ids, true)).toEqual({ status: "invalid", commit: false });
+  });
+
+  it("commits when format is good and id exists in the loaded catalog", () => {
+    expect(evaluateSlug("author/known", ids, true)).toEqual({ status: "valid", commit: true });
+  });
+
+  it("is invalid when format is good but id is missing from the loaded catalog", () => {
+    expect(evaluateSlug("author/unknown", ids, true)).toEqual({ status: "invalid", commit: false });
+  });
+
+  it("commits any well-formed slug when the catalog is unavailable (offline)", () => {
+    expect(evaluateSlug("author/unknown", new Set(), false)).toEqual({ status: "valid", commit: true });
   });
 });
