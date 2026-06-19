@@ -27,3 +27,6 @@ Reads `OPENROUTER_API_KEY` (or prompts and optionally saves to `~/.openrouter-im
 ## How it works
 - BYOK: your key never goes to a shared server. The browser calls OpenRouter directly; a local API route only writes files.
 - Each variation or split prompt is one independent request, so partial failures don't block the rest.
+
+## License
+[MIT](LICENSE)
