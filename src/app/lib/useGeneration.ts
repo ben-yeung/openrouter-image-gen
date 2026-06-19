@@ -1,14 +1,17 @@
 "use client";
 import { useState } from "react";
-import { generateVariations, generateBatch, batchLabel, type GeneratedImage } from "@/core";
+import { generateVariations, generateBatch, generateImage, batchLabel, type GeneratedImage } from "@/core";
 
 export function useGeneration() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [savedDir, setSavedDir] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastParams, setLastParams] = useState<{ apiKey: string; model: string; prompt: string } | null>(null);
+  const [rerolling, setRerolling] = useState<Set<number>>(new Set());
 
   async function run(args: { apiKey: string; model: string; prompt: string; count: number }) {
+    setLastParams({ apiKey: args.apiKey, model: args.model, prompt: args.prompt });
     setLoading(true);
     setError(null);
     setSavedDir(null);
@@ -44,6 +47,7 @@ export function useGeneration() {
   }
 
   async function runBatch(args: { apiKey: string; model: string; prompts: string[] }) {
+    setLastParams({ apiKey: args.apiKey, model: args.model, prompt: args.prompts[0] ?? "" });
     setLoading(true);
     setError(null);
     setSavedDir(null);
@@ -83,5 +87,27 @@ export function useGeneration() {
     }
   }
 
-  return { images, loading, savedDir, error, run, runBatch };
+  async function reroll(index: number) {
+    if (!lastParams) return;
+    const image = images[index];
+    if (!image) return;
+    const prompt = image.prompt ?? lastParams.prompt;
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    setRerolling((prev) => new Set(prev).add(index));
+    const result = await generateImage({
+      apiKey: lastParams.apiKey,
+      model: lastParams.model,
+      prompt,
+      seed,
+      index,
+    });
+    setImages((prev) => prev.map((img, i) => (i === index ? result : img)));
+    setRerolling((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  return { images, loading, savedDir, error, rerolling, run, runBatch, reroll };
 }
