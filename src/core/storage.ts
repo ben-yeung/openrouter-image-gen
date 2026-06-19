@@ -21,6 +21,7 @@ export async function saveSession(input: {
   let n = 1;
   for (const img of successful) {
     const file = `${String(n).padStart(2, "0")}.png`;
+    // All dataUrls produced by generate.ts are base64-encoded PNG data URLs.
     const base64 = img.dataUrl.replace(/^data:image\/\w+;base64,/, "");
     await fs.writeFile(path.join(dir, file), Buffer.from(base64, "base64"));
     images.push({ file, seed: img.seed });

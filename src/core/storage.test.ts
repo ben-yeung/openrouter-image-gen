@@ -40,6 +40,11 @@ describe("saveSession", () => {
     const meta = JSON.parse(await fs.readFile(path.join(dir, "metadata.json"), "utf8"));
     expect(meta.prompt).toBe("a cat");
     expect(meta.model).toBe("m");
+    expect(meta.count).toBe(2);
+    expect(meta.images).toEqual([
+      { file: "01.png", seed: 10 },
+      { file: "02.png", seed: 11 },
+    ]);
   });
 
   it("skips failed variations", async () => {
