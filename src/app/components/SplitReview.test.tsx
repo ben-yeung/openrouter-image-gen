@@ -30,4 +30,13 @@ describe("SplitReview", () => {
     fireEvent.click(screen.getByText(/Generate 2/));
     expect(onConfirm).toHaveBeenCalled();
   });
+
+  it("disables generation and shows progress while busy", () => {
+    const onConfirm = vi.fn();
+    render(<SplitReview prompts={["a", "b"]} onChange={() => {}} onConfirm={onConfirm} onCancel={() => {}} busy />);
+    const button = screen.getByText("Generating…").closest("button")!;
+    expect(button.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(button);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });

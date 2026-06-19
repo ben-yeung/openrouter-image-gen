@@ -4,12 +4,13 @@ import { Trash2, Plus, Sparkles, X } from "lucide-react";
 const WARN_THRESHOLD = 12;
 
 export function SplitReview({
-  prompts, onChange, onConfirm, onCancel,
+  prompts, onChange, onConfirm, onCancel, busy = false,
 }: {
   prompts: string[];
   onChange: (next: string[]) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  busy?: boolean;
 }) {
   const setAt = (i: number, value: string) =>
     onChange(prompts.map((p, idx) => (idx === i ? value : p)));
@@ -58,10 +59,10 @@ export function SplitReview({
         </span>
         <button
           onClick={onConfirm}
-          disabled={n === 0}
-          className="flex items-center gap-2 rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-40"
+          disabled={n === 0 || busy}
+          className="flex items-center gap-2 rounded-lg bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Sparkles className="h-4 w-4" /> Generate {n}
+          <Sparkles className="h-4 w-4" /> {busy ? "Generating…" : `Generate ${n}`}
         </button>
       </div>
     </div>

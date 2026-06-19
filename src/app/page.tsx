@@ -55,7 +55,8 @@ export default function Home() {
     if (!model) return;
     const prompts = (splitList ?? []).map((p) => p.trim()).filter(Boolean);
     if (prompts.length === 0) return;
-    setSplitList(null);
+    // Keep the split list in place so it can be re-run (same or another model)
+    // until the user explicitly dismisses the panel.
     runBatch({ apiKey, model, prompts });
   };
 
@@ -101,6 +102,7 @@ export default function Home() {
             onChange={setSplitList}
             onConfirm={confirmSplit}
             onCancel={() => setSplitList(null)}
+            busy={loading}
           />
         </div>
       )}
