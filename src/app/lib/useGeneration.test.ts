@@ -81,7 +81,11 @@ describe("useGeneration reroll", () => {
 
     const { result } = renderHook(() => useGeneration());
     await act(async () => {
-      await result.current.runBatch({ apiKey: "k", model: "m", prompts: ["a cat", "a dog"] });
+      await result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [{ prompt: "a cat" }, { prompt: "a dog" }],
+      });
     });
     await act(async () => { await result.current.reroll(1); });
 
@@ -89,6 +93,45 @@ describe("useGeneration reroll", () => {
       expect.objectContaining({ prompt: "a dog", index: 1 }),
     );
     expect(result.current.images[1].prompt).toBe("a dog");
+  });
+
+  it("attaches each item's requested path to the matching image", async () => {
+    vi.mocked(generateBatch).mockResolvedValue([
+      img(0, { prompt: "a villa" }),
+      img(1, { prompt: "a cabin" }),
+    ]);
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [
+          { prompt: "a villa", path: "public/images/villa/01.jpg" },
+          { prompt: "a cabin" },
+        ],
+      });
+    });
+
+    expect(result.current.images[0].path).toBe("public/images/villa/01.jpg");
+    expect(result.current.images[1].path).toBeUndefined();
+  });
+
+  it("preserves the requested path on the rerolled slot", async () => {
+    vi.mocked(generateBatch).mockResolvedValue([img(0, { prompt: "a villa" })]);
+    vi.mocked(generateImage).mockResolvedValue(img(0, { seed: 999 }));
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [{ prompt: "a villa", path: "public/images/villa/01.jpg" }],
+      });
+    });
+    await act(async () => { await result.current.reroll(0); });
+
+    expect(result.current.images[0].path).toBe("public/images/villa/01.jpg");
   });
 
   it("clears the index from rerolling after the call resolves", async () => {

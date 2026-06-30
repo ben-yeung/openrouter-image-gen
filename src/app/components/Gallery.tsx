@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { DownloadCloud } from "lucide-react";
-import type { GeneratedImage } from "@/core";
+import { resolveImagePaths, type GeneratedImage } from "@/core";
 import { ImageCard } from "./ImageCard";
 import { Lightbox } from "./Lightbox";
 
@@ -17,11 +17,17 @@ export function Gallery({
   const ok = images.filter((i) => i.dataUrl && !i.error);
   const [selected, setSelected] = useState<number | null>(null);
 
+  // Resolve once across the whole successful batch so a name collision
+  // (two rows sharing an output name) is disambiguated exactly the same way
+  // it will be when the batch is actually saved to disk.
+  const resolvedNames = resolveImagePaths(ok.map((img) => img.path));
+  const outputNameByIndex = new Map(ok.map((img, i) => [img.index, resolvedNames[i]]));
+
   const downloadAll = () => {
     ok.forEach((img) => {
       const a = document.createElement("a");
       a.href = img.dataUrl;
-      a.download = `image-${img.index + 1}.png`;
+      a.download = outputNameByIndex.get(img.index) || `image-${img.index + 1}.png`;
       a.click();
     });
   };
@@ -46,6 +52,7 @@ export function Gallery({
           <ImageCard
             key={img.index}
             image={img}
+            outputName={outputNameByIndex.get(img.index)}
             onOpen={img.dataUrl && !img.error ? () => setSelected(ok.indexOf(img)) : undefined}
             onReroll={onReroll}
             rerolling={rerolling}

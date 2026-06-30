@@ -98,4 +98,63 @@ describe("saveSession (batch)", () => {
     expect(session.kind).toBe("variations");
     expect(session.images[0]).toEqual({ file: "01.png", seed: 1 });
   });
+
+  it("collapses a deep requested path to just the last folder, creating it", async () => {
+    const b64 = Buffer.from("img").toString("base64");
+    const { dir, session } = await saveSession({
+      prompt: "a villa +1 more",
+      model: "m",
+      kind: "batch",
+      images: [
+        {
+          index: 0,
+          dataUrl: `data:image/png;base64,${b64}`,
+          seed: 1,
+          prompt: "a villa",
+          path: "public/images/properties/villa/01.jpg",
+        },
+      ],
+      rootDir: root,
+    });
+    expect(session.images[0].file).toBe("villa/01.png");
+    const written = await fs.readFile(path.join(dir, "villa/01.png"));
+    expect(written.toString()).toBe("img");
+  });
+
+  it("falls back to sequential naming for items in the batch without a path", async () => {
+    const b64 = Buffer.from("img").toString("base64");
+    const { session } = await saveSession({
+      prompt: "a villa +1 more",
+      model: "m",
+      kind: "batch",
+      images: [
+        { index: 0, dataUrl: `data:image/png;base64,${b64}`, seed: 1, prompt: "a villa", path: "villa/01.jpg" },
+        { index: 1, dataUrl: `data:image/png;base64,${b64}`, seed: 2, prompt: "a cabin" },
+      ],
+      rootDir: root,
+    });
+    expect(session.images.map((i) => i.file)).toEqual(["villa/01.png", "02.png"]);
+  });
+
+  it("sanitizes a path that attempts traversal outside the session folder", async () => {
+    const b64 = Buffer.from("img").toString("base64");
+    const { dir, session } = await saveSession({
+      prompt: "p",
+      model: "m",
+      kind: "batch",
+      images: [
+        {
+          index: 0,
+          dataUrl: `data:image/png;base64,${b64}`,
+          seed: 1,
+          prompt: "p",
+          path: "../../etc/passwd",
+        },
+      ],
+      rootDir: root,
+    });
+    expect(session.images[0].file).toBe("etc/passwd.png");
+    const written = await fs.readFile(path.join(dir, "etc/passwd.png"));
+    expect(written.toString()).toBe("img");
+  });
 });

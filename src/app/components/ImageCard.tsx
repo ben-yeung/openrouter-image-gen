@@ -4,11 +4,13 @@ import type { GeneratedImage } from "@/core";
 
 export function ImageCard({
   image,
+  outputName,
   onOpen,
   onReroll,
   rerolling = new Set(),
 }: {
   image: GeneratedImage;
+  outputName?: string;
   onOpen?: () => void;
   onReroll?: (index: number) => void;
   rerolling?: Set<number>;
@@ -59,15 +61,18 @@ export function ImageCard({
           )}
           <a
             href={image.dataUrl}
-            download={`image-${image.index + 1}.png`}
+            download={outputName || `image-${image.index + 1}.png`}
             className="flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-xs"
           >
             <Download className="h-3.5 w-3.5" /> Save
           </a>
         </div>
       </div>
-      {image.prompt && (
-        <p className="line-clamp-2 px-2 py-1.5 text-xs text-neutral-400">{image.prompt}</p>
+      {(outputName || image.prompt) && (
+        <div className="px-2 py-1.5">
+          {outputName && <p className="truncate text-xs font-medium text-neutral-300">{outputName}</p>}
+          {image.prompt && <p className="line-clamp-2 text-xs text-neutral-400">{image.prompt}</p>}
+        </div>
       )}
     </div>
   );

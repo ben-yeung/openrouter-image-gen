@@ -53,3 +53,22 @@ describe("ImageCard reroll", () => {
     expect(screen.queryByLabelText("Reroll image 1")).toBeNull();
   });
 });
+
+describe("ImageCard output name", () => {
+  it("shows the given output name", () => {
+    render(<ImageCard image={img(0)} outputName="villa/01.png" rerolling={new Set()} />);
+    expect(screen.getByText("villa/01.png")).toBeTruthy();
+  });
+
+  it("uses the output name as the download filename", () => {
+    render(<ImageCard image={img(0)} outputName="villa/01.png" rerolling={new Set()} />);
+    const link = screen.getByText("Save").closest("a") as HTMLAnchorElement;
+    expect(link.getAttribute("download")).toBe("villa/01.png");
+  });
+
+  it("falls back to the generic filename when no output name is given", () => {
+    render(<ImageCard image={img(0)} rerolling={new Set()} />);
+    const link = screen.getByText("Save").closest("a") as HTMLAnchorElement;
+    expect(link.getAttribute("download")).toBe("image-1.png");
+  });
+});

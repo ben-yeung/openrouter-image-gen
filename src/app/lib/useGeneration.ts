@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { generateVariations, generateBatch, generateImage, batchLabel, type GeneratedImage } from "@/core";
+import { generateVariations, generateBatch, generateImage, batchLabel, type GeneratedImage, type SplitItem } from "@/core";
 
 export function useGeneration() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
@@ -46,26 +46,30 @@ export function useGeneration() {
     }
   }
 
-  async function runBatch(args: { apiKey: string; model: string; prompts: string[] }) {
-    setLastParams({ apiKey: args.apiKey, model: args.model, prompt: args.prompts[0] ?? "" });
+  async function runBatch(args: { apiKey: string; model: string; items: SplitItem[] }) {
+    const prompts = args.items.map((item) => item.prompt);
+    setLastParams({ apiKey: args.apiKey, model: args.model, prompt: prompts[0] ?? "" });
     setLoading(true);
     setError(null);
     setSavedDir(null);
     setImages([]);
     try {
-      const results = await generateBatch(args.prompts, {
+      const results = await generateBatch(prompts, {
         apiKey: args.apiKey,
         model: args.model,
       });
-      setImages(results);
+      const withPaths = results.map((r, i) =>
+        args.items[i]?.path ? { ...r, path: args.items[i].path } : r,
+      );
+      setImages(withPaths);
 
-      const successful = results.filter((r) => r.dataUrl && !r.error);
+      const successful = withPaths.filter((r) => r.dataUrl && !r.error);
       if (successful.length > 0) {
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: batchLabel(args.prompts),
+            prompt: batchLabel(prompts),
             model: args.model,
             kind: "batch",
             images: successful,
@@ -92,6 +96,7 @@ export function useGeneration() {
     const image = images[index];
     if (!image) return;
     const prompt = image.prompt ?? lastParams.prompt;
+    const requestedPath = image.path;
     const seed = Math.floor(Math.random() * 1_000_000_000);
     setRerolling((prev) => new Set(prev).add(index));
     try {
@@ -102,7 +107,11 @@ export function useGeneration() {
         seed,
         index,
       });
-      setImages((prev) => prev.map((img, i) => (i === index ? { ...result, prompt } : img)));
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === index ? { ...result, prompt, ...(requestedPath ? { path: requestedPath } : {}) } : img,
+        ),
+      );
     } finally {
       setRerolling((prev) => {
         const next = new Set(prev);

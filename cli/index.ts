@@ -6,7 +6,7 @@ import { loadKey, saveKey, loadSplitModel, saveSplitModel } from "./config.js";
 import { fetchImageModels, isValidSlugFormat, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
-import { splitPromptsLLM, batchLabel } from "../src/core/split.js";
+import { splitPrompts, batchLabel, type SplitItem } from "../src/core/split.js";
 
 function bail<T>(value: T): asserts value is Exclude<T, symbol> {
   if (isCancel(value)) {
@@ -51,7 +51,7 @@ async function generateFlow(apiKey: string) {
   }
   if (!prompt) { note("Empty prompt — skipping.", "Skip"); return; }
 
-  let prompts: string[] | null = null;
+  let items: SplitItem[] | null = null;
   const splitModel = loadSplitModel();
   const trySplit = await confirm({
     message: `Extract multiple prompts from this text using ${splitModel}?`,
@@ -62,14 +62,17 @@ async function generateFlow(apiKey: string) {
     const ss = spinner();
     ss.start("Extracting prompts…");
     try {
-      const extracted = await splitPromptsLLM(prompt, { apiKey, model: splitModel });
+      const extracted = await splitPrompts(prompt, { apiKey, model: splitModel });
       ss.stop(`Found ${extracted.length} prompt(s).`);
-      note(extracted.map((p, i) => `${i + 1}. ${p}`).join("\n"), "Extracted prompts");
+      note(
+        extracted.map((it, i) => `${i + 1}. ${it.prompt}${it.path ? `  → ${it.path}` : ""}`).join("\n"),
+        "Extracted prompts",
+      );
       const ok = await confirm({
         message: `Generate these ${extracted.length} as separate images? (${extracted.length} requests)`,
       });
       bail(ok);
-      if (ok) prompts = extracted;
+      if (ok) items = extracted;
     } catch (e) {
       ss.stop("Extraction failed.");
       note((e as Error).message, "Split failed");
@@ -97,16 +100,23 @@ async function generateFlow(apiKey: string) {
     modelId = (slug as string).trim();
   }
 
-  if (prompts) {
+  if (items) {
+    const prompts = items.map((it) => it.prompt);
     const s2 = spinner();
     s2.start(`Generating ${prompts.length} image(s)…`);
-    const images = await generateBatch(prompts, { apiKey, model: modelId });
-    const ok = images.filter((i) => i.dataUrl && !i.error);
+    const generated = await generateBatch(prompts, { apiKey, model: modelId });
+    const withPaths = generated.map((img, i) => (items![i]?.path ? { ...img, path: items![i].path } : img));
+    const ok = withPaths.filter((i) => i.dataUrl && !i.error);
     s2.stop(`Generated ${ok.length}/${prompts.length}.`);
-    const failed = images.filter((i) => i.error);
+    const failed = withPaths.filter((i) => i.error);
     if (failed.length) note(failed.map((f) => `#${f.index + 1}: ${f.error}`).join("\n"), "Errors");
     if (ok.length === 0) return;
-    const { dir } = await saveSession({ prompt: batchLabel(prompts), model: modelId, kind: "batch", images });
+    const { dir } = await saveSession({
+      prompt: batchLabel(prompts),
+      model: modelId,
+      kind: "batch",
+      images: withPaths,
+    });
     note(dir, "Saved");
     return;
   }
