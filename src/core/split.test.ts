@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { splitPrompts, batchLabel, SplitError } from "./split";
+import { splitPrompts, combinePrompt, batchLabel, SplitError } from "./split";
 
 describe("batchLabel", () => {
   it("labels a multi-prompt batch with '+N more'", () => {
@@ -7,6 +7,32 @@ describe("batchLabel", () => {
   });
   it("returns the single prompt unchanged when there is one", () => {
     expect(batchLabel(["a cat"])).toBe("a cat");
+  });
+});
+
+describe("combinePrompt", () => {
+  it("appends the suffix with just a space when the prompt already ends with punctuation", () => {
+    expect(combinePrompt("A villa at sunset.", "Photorealistic, 8k")).toBe(
+      "A villa at sunset. Photorealistic, 8k",
+    );
+  });
+
+  it("inserts '. ' between prompt and suffix when the prompt has no trailing punctuation", () => {
+    expect(combinePrompt("A villa at sunset", "Photorealistic, 8k")).toBe(
+      "A villa at sunset. Photorealistic, 8k",
+    );
+  });
+
+  it("returns the prompt unchanged when there is no suffix", () => {
+    expect(combinePrompt("A villa at sunset.")).toBe("A villa at sunset.");
+  });
+
+  it("returns the prompt unchanged when the suffix is blank", () => {
+    expect(combinePrompt("A villa at sunset.", "   ")).toBe("A villa at sunset.");
+  });
+
+  it("trims both the prompt and the suffix", () => {
+    expect(combinePrompt("  A villa  ", "  8k  ")).toBe("A villa. 8k");
   });
 });
 
@@ -33,6 +59,22 @@ describe("splitPrompts", () => {
     expect(items).toEqual([
       { prompt: "a villa", path: "public/images/villa/01.jpg" },
       { prompt: "a pool", path: "public/images/villa/02.jpg" },
+    ]);
+  });
+
+  it("parses a JSON array of { prompt, suffix } objects from the model response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      arrayResponse(
+        JSON.stringify([
+          { prompt: "a villa", suffix: "Photorealistic, 8k" },
+          { prompt: "a pool", suffix: "Photorealistic, 8k" },
+        ]),
+      ),
+    );
+    const items = await splitPrompts("a villa and a pool", { apiKey: "k" }, fetchImpl as unknown as typeof fetch);
+    expect(items).toEqual([
+      { prompt: "a villa", suffix: "Photorealistic, 8k" },
+      { prompt: "a pool", suffix: "Photorealistic, 8k" },
     ]);
   });
 
@@ -81,6 +123,7 @@ describe("splitPrompts", () => {
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[0].content).toMatch(/Do NOT rewrite/);
     expect(body.messages[0].content).toMatch(/Never invent a path/);
+    expect(body.messages[0].content).toMatch(/shared style or technical descriptor/);
     expect(body.messages[1]).toEqual({ role: "user", content: "my messy text" });
   });
 

@@ -18,7 +18,13 @@ export function SplitReview({
   const setPathAt = (i: number, value: string) =>
     onChange(items.map((it, idx) => (idx === i ? { ...it, path: value || undefined } : it)));
   const removeAt = (i: number) => onChange(items.filter((_, idx) => idx !== i));
-  const addRow = () => onChange([...items, { prompt: "" }]);
+
+  // Shown once at the top rather than duplicated per row: applied uniformly
+  // to every item so they all share the same suffix at generation time.
+  const suffix = items.find((it) => it.suffix)?.suffix ?? "";
+  const setSuffix = (value: string) =>
+    onChange(items.map((it) => ({ ...it, suffix: value || undefined })));
+  const addRow = () => onChange([...items, { prompt: "", ...(suffix ? { suffix } : {}) }]);
 
   const n = items.filter((it) => it.prompt.trim()).length;
   const large = n >= WARN_THRESHOLD;
@@ -28,6 +34,25 @@ export function SplitReview({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">Review prompts to generate</h2>
         <button onClick={onCancel} aria-label="Cancel split"><X className="h-4 w-4" /></button>
+      </div>
+
+      <div className="flex items-center gap-2 border-b border-neutral-800/60 pb-4">
+        <span className="w-6" aria-hidden="true" />
+        <div className="flex-1 space-y-1">
+          <label htmlFor="split-suffix" className="block text-xs text-neutral-400">
+            Style suffix <span className="text-neutral-600">(applied to every prompt at generation time)</span>
+          </label>
+          <input
+            id="split-suffix"
+            value={suffix}
+            onChange={(e) => setSuffix(e.target.value)}
+            placeholder="Style suffix (optional)"
+            className="w-full rounded-lg border border-neutral-800 bg-neutral-950/60 px-3 py-1.5 text-sm text-neutral-300 outline-none focus:border-neutral-500"
+          />
+        </div>
+        <button onClick={() => setSuffix("")} aria-label="Clear style suffix">
+          <Trash2 className="h-4 w-4 text-neutral-500 hover:text-neutral-300" />
+        </button>
       </div>
 
       <ul className="space-y-4">

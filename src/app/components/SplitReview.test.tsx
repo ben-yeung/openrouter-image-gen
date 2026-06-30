@@ -122,4 +122,107 @@ describe("SplitReview", () => {
     fireEvent.change(screen.getByLabelText("Output name 1"), { target: { value: "" } });
     expect(onChange).toHaveBeenCalledWith([{ prompt: "a villa", path: undefined }]);
   });
+
+  it("shows the shared style suffix once, not per row", () => {
+    render(
+      <SplitReview
+        items={[
+          { prompt: "a villa", suffix: "Photorealistic, 8k" },
+          { prompt: "a pool", suffix: "Photorealistic, 8k" },
+        ]}
+        onChange={() => {}}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const input = screen.getByLabelText(/Style suffix/) as HTMLInputElement;
+    expect(input.value).toBe("Photorealistic, 8k");
+    expect(screen.getAllByDisplayValue("Photorealistic, 8k")).toHaveLength(1);
+  });
+
+  it("leaves the shared suffix field empty when no item has one", () => {
+    render(
+      <SplitReview
+        items={[{ prompt: "a cat" }]}
+        onChange={() => {}}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect((screen.getByLabelText(/Style suffix/) as HTMLInputElement).value).toBe("");
+  });
+
+  it("editing the shared suffix applies it to every row", () => {
+    const onChange = vi.fn();
+    render(
+      <SplitReview
+        items={[{ prompt: "a cat" }, { prompt: "a dog" }]}
+        onChange={onChange}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/Style suffix/), { target: { value: "8k, ultra-detailed" } });
+    expect(onChange).toHaveBeenCalledWith([
+      { prompt: "a cat", suffix: "8k, ultra-detailed" },
+      { prompt: "a dog", suffix: "8k, ultra-detailed" },
+    ]);
+  });
+
+  it("clearing the shared suffix field removes it from every row", () => {
+    const onChange = vi.fn();
+    render(
+      <SplitReview
+        items={[
+          { prompt: "a villa", suffix: "8k" },
+          { prompt: "a pool", suffix: "8k" },
+        ]}
+        onChange={onChange}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/Style suffix/), { target: { value: "" } });
+    expect(onChange).toHaveBeenCalledWith([
+      { prompt: "a villa", suffix: undefined },
+      { prompt: "a pool", suffix: undefined },
+    ]);
+  });
+
+  it("clicking the clear-suffix trash icon removes the suffix from every row", () => {
+    const onChange = vi.fn();
+    render(
+      <SplitReview
+        items={[
+          { prompt: "a villa", suffix: "8k" },
+          { prompt: "a pool", suffix: "8k" },
+        ]}
+        onChange={onChange}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Clear style suffix"));
+    expect(onChange).toHaveBeenCalledWith([
+      { prompt: "a villa", suffix: undefined },
+      { prompt: "a pool", suffix: undefined },
+    ]);
+  });
+
+  it("a newly added row inherits the current shared suffix", () => {
+    const onChange = vi.fn();
+    render(
+      <SplitReview
+        items={[{ prompt: "a villa", suffix: "8k" }]}
+        onChange={onChange}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("Add prompt"));
+    expect(onChange).toHaveBeenCalledWith([
+      { prompt: "a villa", suffix: "8k" },
+      { prompt: "", suffix: "8k" },
+    ]);
+  });
 });

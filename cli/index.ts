@@ -6,7 +6,7 @@ import { loadKey, saveKey, loadSplitModel, saveSplitModel } from "./config.js";
 import { fetchImageModels, isValidSlugFormat, TOP_MODELS } from "../src/core/models.js";
 import { generateVariations, generateBatch } from "../src/core/generate.js";
 import { saveSession } from "../src/core/storage.js";
-import { splitPrompts, batchLabel, type SplitItem } from "../src/core/split.js";
+import { splitPrompts, combinePrompt, batchLabel, type SplitItem } from "../src/core/split.js";
 
 function bail<T>(value: T): asserts value is Exclude<T, symbol> {
   if (isCancel(value)) {
@@ -65,7 +65,13 @@ async function generateFlow(apiKey: string) {
       const extracted = await splitPrompts(prompt, { apiKey, model: splitModel });
       ss.stop(`Found ${extracted.length} prompt(s).`);
       note(
-        extracted.map((it, i) => `${i + 1}. ${it.prompt}${it.path ? `  → ${it.path}` : ""}`).join("\n"),
+        extracted
+          .map((it, i) => {
+            const path = it.path ? `  → ${it.path}` : "";
+            const suffix = it.suffix ? `  [+ suffix: ${it.suffix}]` : "";
+            return `${i + 1}. ${it.prompt}${path}${suffix}`;
+          })
+          .join("\n"),
         "Extracted prompts",
       );
       const ok = await confirm({
@@ -101,7 +107,7 @@ async function generateFlow(apiKey: string) {
   }
 
   if (items) {
-    const prompts = items.map((it) => it.prompt);
+    const prompts = items.map((it) => combinePrompt(it.prompt, it.suffix));
     const s2 = spinner();
     s2.start(`Generating ${prompts.length} image(s)…`);
     const generated = await generateBatch(prompts, { apiKey, model: modelId });
