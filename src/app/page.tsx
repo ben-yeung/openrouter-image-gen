@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Settings, KeyRound, Scissors } from "lucide-react";
-import { resolveImagePaths, type SplitItem } from "@/core";
+import { combinePrompt, resolveImagePaths, type SplitItem } from "@/core";
 import { useApiKey } from "./lib/useApiKey";
 import { useGeneration } from "./lib/useGeneration";
 import { useSplit } from "./lib/useSplit";
@@ -59,7 +59,10 @@ export default function Home() {
 		if (!model) return;
 		const items = (splitList ?? [])
 			.map((it) => ({ ...it, prompt: it.prompt.trim() }))
-			.filter((it) => it.prompt);
+			.filter((it) => it.prompt)
+			// The suffix is reviewed/edited as its own field but applied under the
+			// hood: fold it back into the prompt right before generation.
+			.map((it) => ({ ...it, prompt: combinePrompt(it.prompt, it.suffix) }));
 		if (items.length === 0) return;
 		// Keep the split list in place so it can be re-run (same or another model)
 		// until the user explicitly dismisses the panel.
@@ -76,39 +79,46 @@ export default function Home() {
 				</button>
 			</header>
 
-			<PromptForm
-				prompt={prompt}
-				setPrompt={(v) => {
-					setSplitError(null);
-					setPrompt(v);
-				}}
-				model={model}
-				setModel={setModel}
-				count={count}
-				setCount={setCount}
-				disabled={loading}
-				onGenerate={onGenerate}
-				secondaryAction={
-					prompt.trim() ? (
-						<button onClick={openSplitConfirm} disabled={loading || splitting} className="flex items-center gap-2 rounded-lg border border-neutral-700 px-4 py-2.5 text-sm hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed">
-							<Scissors className="h-4 w-4" /> Split prompts
-						</button>
-					) : null
-				}
-			/>
+			{/* The split review replaces the prompt form rather than stacking
+			    beneath it, so the batch's own "Generate" is the only one on
+			    screen. Cancelling the review reverts to the form. */}
+			{splitList ? (
+				<SplitReview items={splitList} onChange={setSplitList} onConfirm={confirmSplit} onCancel={() => setSplitList(null)} busy={loading} />
+			) : (
+				<>
+					<PromptForm
+						prompt={prompt}
+						setPrompt={(v) => {
+							setSplitError(null);
+							setPrompt(v);
+						}}
+						model={model}
+						setModel={setModel}
+						count={count}
+						setCount={setCount}
+						disabled={loading}
+						onGenerate={onGenerate}
+						secondaryAction={
+							prompt.trim() ? (
+								<button onClick={openSplitConfirm} disabled={loading || splitting} className="flex items-center gap-2 rounded-lg border border-neutral-700 px-4 py-2.5 text-sm hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed">
+									<Scissors className="h-4 w-4" /> Split prompts
+								</button>
+							) : null
+						}
+					/>
 
-			{splitError && <p className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">{splitError}</p>}
-
-			{splitList && (
-				<div className="mt-4">
-					<SplitReview items={splitList} onChange={setSplitList} onConfirm={confirmSplit} onCancel={() => setSplitList(null)} busy={loading} />
-				</div>
+					{splitError && <p className="mt-3 rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">{splitError}</p>}
+				</>
 			)}
 
 			<section className="mt-8">
 				{error && <p className="mb-4 rounded-lg border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">{error}</p>}
 				{savedDir && <p className="mb-4 text-xs text-neutral-500">Saved to {savedDir}</p>}
-				{loading ? <LoadingGrid count={count} /> : <Gallery images={images} onReroll={reroll} rerolling={rerolling} />}
+				{images.length > 0 ? (
+					<Gallery images={images} onReroll={reroll} rerolling={rerolling} />
+				) : loading ? (
+					<LoadingGrid count={count} />
+				) : null}
 			</section>
 
 			{showSplitConfirm && <SplitConfirmModal model={splitModel} loading={splitting} onConfirm={runExtraction} onCancel={() => setShowSplitConfirm(false)} />}

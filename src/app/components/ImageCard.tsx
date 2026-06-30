@@ -15,11 +15,44 @@ export function ImageCard({
   onReroll?: (index: number) => void;
   rerolling?: Set<number>;
 }) {
-  if (image.error || !image.dataUrl) {
+  if (image.pending) {
     return (
-      <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 p-3 text-center text-xs text-neutral-500">
-        <ImageOff className="h-5 w-5" />
-        <span>{image.error ?? "Failed"}</span>
+      <div className="flex aspect-square items-center justify-center rounded-xl bg-neutral-800 animate-pulse">
+        <Loader2 className="h-5 w-5 animate-spin text-neutral-500" />
+      </div>
+    );
+  }
+
+  if (image.error || !image.dataUrl) {
+    const isRetrying = rerolling.has(image.index);
+    return (
+      <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+        <div className="flex aspect-square flex-col items-center justify-center gap-2 p-3 text-center text-xs text-neutral-500">
+          {isRetrying ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <>
+              <ImageOff className="h-5 w-5" />
+              <span className="line-clamp-3">{image.error ?? "Failed"}</span>
+              {onReroll && (
+                <button
+                  type="button"
+                  onClick={() => onReroll(image.index)}
+                  aria-label={`Retry image ${image.index + 1}`}
+                  className="mt-1 flex items-center gap-1 rounded-lg border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Retry
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        {(outputName || image.prompt) && (
+          <div className="px-2 py-1.5">
+            {outputName && <p className="truncate text-xs font-medium text-neutral-300">{outputName}</p>}
+            {image.prompt && <p className="line-clamp-2 text-xs text-neutral-400">{image.prompt}</p>}
+          </div>
+        )}
       </div>
     );
   }

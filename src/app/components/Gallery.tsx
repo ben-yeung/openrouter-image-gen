@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { DownloadCloud } from "lucide-react";
-import { resolveImagePaths, type GeneratedImage } from "@/core";
+import { resolveImagePaths, sanitizeImagePath, type GeneratedImage } from "@/core";
 import { ImageCard } from "./ImageCard";
 import { Lightbox } from "./Lightbox";
 
@@ -52,7 +52,10 @@ export function Gallery({
           <ImageCard
             key={img.index}
             image={img}
-            outputName={outputNameByIndex.get(img.index)}
+            // Successful cards use the batch-resolved name (matches what's saved);
+            // error cards aren't in that map, so fall back to their own path so
+            // the user can still tell which item failed.
+            outputName={outputNameByIndex.get(img.index) ?? (img.path ? sanitizeImagePath(img.path) : undefined)}
             onOpen={img.dataUrl && !img.error ? () => setSelected(ok.indexOf(img)) : undefined}
             onReroll={onReroll}
             rerolling={rerolling}

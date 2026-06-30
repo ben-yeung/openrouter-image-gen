@@ -42,15 +42,60 @@ describe("ImageCard reroll", () => {
     expect(btn.disabled).toBe(false);
   });
 
-  it("does not render a reroll button for error cards", () => {
+  it("renders a Retry button on error cards and calls onReroll with the index", () => {
+    const onReroll = vi.fn();
+    render(
+      <ImageCard
+        image={{ index: 0, dataUrl: "", error: "Request failed (500)" }}
+        onReroll={onReroll}
+        rerolling={new Set()}
+      />,
+    );
+    // The hover "Reroll" affordance belongs to image cards; error cards expose "Retry".
+    expect(screen.queryByLabelText("Reroll image 1")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Retry image 1"));
+    expect(onReroll).toHaveBeenCalledWith(0);
+  });
+
+  it("shows a spinner instead of the Retry button while an error card is retrying", () => {
     render(
       <ImageCard
         image={{ index: 0, dataUrl: "", error: "Request failed (500)" }}
         onReroll={vi.fn()}
+        rerolling={new Set([0])}
+      />,
+    );
+    expect(screen.queryByLabelText("Retry image 1")).toBeNull();
+  });
+
+  it("shows the output name and prompt on an error card so the failed item is identifiable", () => {
+    render(
+      <ImageCard
+        image={{ index: 0, dataUrl: "", error: "No image returned", prompt: "Interior of the villa", path: "villa/03.jpg" }}
+        outputName="villa/03.png"
+        onReroll={vi.fn()}
         rerolling={new Set()}
       />,
     );
+    expect(screen.getByText("villa/03.png")).toBeTruthy();
+    expect(screen.getByText("Interior of the villa")).toBeTruthy();
+  });
+
+  it("does not render a Retry button on error cards when onReroll is not provided", () => {
+    render(
+      <ImageCard image={{ index: 0, dataUrl: "", error: "Request failed (500)" }} rerolling={new Set()} />,
+    );
+    expect(screen.queryByLabelText("Retry image 1")).toBeNull();
+  });
+
+  it("renders a pending placeholder (no image, no reroll, no error) while generating", () => {
+    const { container } = render(
+      <ImageCard image={{ index: 0, dataUrl: "", pending: true }} onReroll={vi.fn()} rerolling={new Set()} />,
+    );
     expect(screen.queryByLabelText("Reroll image 1")).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText("Failed")).toBeNull();
+    expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 });
 
