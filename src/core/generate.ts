@@ -55,12 +55,18 @@ export async function generateImage(
 export async function generateVariations(
   params: Omit<GenerateParams, "seed" | "index">,
   count: number,
-  opts: { fetchImpl?: typeof fetch; baseSeed?: number } = {},
+  opts: { fetchImpl?: typeof fetch; baseSeed?: number; onResult?: (image: GeneratedImage) => void } = {},
 ): Promise<GeneratedImage[]> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const baseSeed = opts.baseSeed ?? Math.floor(Math.random() * 1_000_000_000);
+  // Each request resolves independently and reports itself the moment it
+  // settles, so the UI can reveal images as they arrive instead of waiting
+  // for the whole batch.
   const tasks = Array.from({ length: count }, (_, i) =>
-    generateImage({ ...params, seed: baseSeed + i, index: i }, fetchImpl),
+    generateImage({ ...params, seed: baseSeed + i, index: i }, fetchImpl).then((image) => {
+      opts.onResult?.(image);
+      return image;
+    }),
   );
   const settled = await Promise.allSettled(tasks);
   return settled.map((r, i) =>
@@ -70,21 +76,29 @@ export async function generateVariations(
   );
 }
 
-/** Run thunks with bounded concurrency, preserving allSettled semantics. */
+/**
+ * Run thunks with bounded concurrency, preserving allSettled semantics.
+ * `onSettled` fires for each index the moment it settles, so callers can
+ * stream results out as they complete rather than awaiting the whole pool.
+ */
 async function runThrottled<T>(
   thunks: Array<() => Promise<T>>,
   concurrency: number,
+  onSettled?: (index: number, result: PromiseSettledResult<T>) => void,
 ): Promise<PromiseSettledResult<T>[]> {
   const results: PromiseSettledResult<T>[] = new Array(thunks.length);
   let next = 0;
   async function worker(): Promise<void> {
     while (next < thunks.length) {
       const i = next++;
+      let result: PromiseSettledResult<T>;
       try {
-        results[i] = { status: "fulfilled", value: await thunks[i]() };
+        result = { status: "fulfilled", value: await thunks[i]() };
       } catch (reason) {
-        results[i] = { status: "rejected", reason };
+        result = { status: "rejected", reason };
       }
+      results[i] = result;
+      onSettled?.(i, result);
     }
   }
   const poolSize = Math.max(1, Math.min(concurrency, thunks.length));
@@ -96,20 +110,27 @@ async function runThrottled<T>(
 export async function generateBatch(
   prompts: string[],
   params: Omit<GenerateParams, "prompt" | "seed" | "index">,
-  opts: { fetchImpl?: typeof fetch; baseSeed?: number; concurrency?: number } = {},
+  opts: { fetchImpl?: typeof fetch; baseSeed?: number; concurrency?: number; onResult?: (image: GeneratedImage) => void } = {},
 ): Promise<GeneratedImage[]> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const baseSeed = opts.baseSeed ?? Math.floor(Math.random() * 1_000_000_000);
   const concurrency = Math.max(5, Math.min(10, opts.concurrency ?? 6));
 
+  // Build the GeneratedImage for a settled slot the same way whether it's
+  // reported optimistically or in the final array, so the two never diverge.
+  const toImage = (i: number, r: PromiseSettledResult<GeneratedImage>): GeneratedImage =>
+    r.status === "fulfilled"
+      ? { ...r.value, prompt: prompts[i] }
+      : { index: i, seed: baseSeed + i, dataUrl: "", prompt: prompts[i], error: String(r.reason) };
+
   const thunks = prompts.map((prompt, i) => () =>
     generateImage({ ...params, prompt, seed: baseSeed + i, index: i }, fetchImpl),
   );
-  const settled = await runThrottled(thunks, concurrency);
-
-  return settled.map((r, i) =>
-    r.status === "fulfilled"
-      ? { ...r.value, prompt: prompts[i] }
-      : { index: i, seed: baseSeed + i, dataUrl: "", prompt: prompts[i], error: String(r.reason) },
+  const settled = await runThrottled(
+    thunks,
+    concurrency,
+    opts.onResult ? (i, r) => opts.onResult!(toImage(i, r)) : undefined,
   );
+
+  return settled.map((r, i) => toImage(i, r));
 }

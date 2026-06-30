@@ -134,6 +134,86 @@ describe("useGeneration reroll", () => {
     expect(result.current.images[0].path).toBe("public/images/villa/01.jpg");
   });
 
+  it("seeds pending placeholders immediately, before any image resolves", async () => {
+    let resolveVariations: (imgs: ReturnType<typeof img>[]) => void = () => {};
+    vi.mocked(generateVariations).mockReturnValue(
+      new Promise((resolve) => {
+        resolveVariations = resolve;
+      }) as ReturnType<typeof generateVariations>,
+    );
+
+    const { result } = renderHook(() => useGeneration());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.run({ apiKey: "k", model: "m", prompt: "p", count: 3 });
+    });
+
+    // Slots exist and are marked pending before the generation promise settles.
+    expect(result.current.images).toHaveLength(3);
+    expect(result.current.images.every((i) => i.pending && !i.dataUrl)).toBe(true);
+
+    await act(async () => {
+      resolveVariations([img(0), img(1), img(2)]);
+      await pending;
+    });
+    expect(result.current.images.every((i) => !i.pending)).toBe(true);
+  });
+
+  it("reveals each variation in its slot as onResult reports it", async () => {
+    vi.mocked(generateVariations).mockImplementation(
+      (async (
+        _params: unknown,
+        count: number,
+        opts?: { onResult?: (image: ReturnType<typeof img>) => void },
+      ) => {
+        const results = Array.from({ length: count }, (_, i) => img(i));
+        // Stream the last slot first to prove placement is by index, not order.
+        for (const r of [...results].reverse()) opts?.onResult?.(r);
+        return results;
+      }) as unknown as typeof generateVariations,
+    );
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.run({ apiKey: "k", model: "m", prompt: "p", count: 3 });
+    });
+
+    expect(result.current.images.map((i) => i.index)).toEqual([0, 1, 2]);
+    expect(result.current.images.map((i) => i.dataUrl)).toEqual([
+      "data:image/png;base64,AAA0",
+      "data:image/png;base64,AAA1",
+      "data:image/png;base64,AAA2",
+    ]);
+  });
+
+  it("seeds batch placeholders carrying each slot's prompt and path", async () => {
+    vi.mocked(generateBatch).mockReturnValue(
+      new Promise(() => {}) as ReturnType<typeof generateBatch>,
+    );
+
+    const { result } = renderHook(() => useGeneration());
+    act(() => {
+      result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [
+          { prompt: "a villa", path: "public/images/villa/01.jpg" },
+          { prompt: "a cabin" },
+        ],
+      });
+    });
+
+    expect(result.current.images).toHaveLength(2);
+    expect(result.current.images[0]).toMatchObject({
+      index: 0,
+      pending: true,
+      prompt: "a villa",
+      path: "public/images/villa/01.jpg",
+    });
+    expect(result.current.images[1]).toMatchObject({ index: 1, pending: true, prompt: "a cabin" });
+    expect(result.current.images[1].path).toBeUndefined();
+  });
+
   it("clears the index from rerolling after the call resolves", async () => {
     vi.mocked(generateVariations).mockResolvedValue([img(0)]);
     vi.mocked(generateImage).mockResolvedValue(img(0, { seed: 42 }));

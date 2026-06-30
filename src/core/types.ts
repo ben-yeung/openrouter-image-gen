@@ -16,10 +16,11 @@ export interface GenerateParams {
 
 export interface GeneratedImage {
   index: number;
-  dataUrl: string;   // "" when error is set
+  dataUrl: string;   // "" when error is set or still pending
   seed?: number;
   prompt?: string;   // the prompt that produced this image (batch mode)
   path?: string;      // requested output path/name (batch mode, structured input)
+  pending?: boolean;  // slot is still generating (optimistic placeholder, no result yet)
   error?: string;
 }
 

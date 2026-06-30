@@ -91,6 +91,17 @@ describe("generateVariations", () => {
     expect(imgs.filter((i) => i.dataUrl !== "")).toHaveLength(1);
     expect(imgs.filter((i) => i.error !== undefined)).toHaveLength(1);
   });
+
+  it("reports each image via onResult as it settles", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(imageResponse("data:image/png;base64,AAA"));
+    const seen: number[] = [];
+    await generateVariations(
+      { apiKey: "k", model: "m", prompt: "p" },
+      3,
+      { fetchImpl: fetchImpl as unknown as typeof fetch, baseSeed: 0, onResult: (img) => seen.push(img.index) },
+    );
+    expect([...seen].sort()).toEqual([0, 1, 2]);
+  });
 });
 
 import { generateBatch } from "./generate";
@@ -148,5 +159,24 @@ describe("generateBatch", () => {
     expect(imgs.filter((i) => i.dataUrl)).toHaveLength(1);
     const failed = imgs.find((i) => i.error);
     expect(failed?.prompt).toBe("bad prompt");
+  });
+
+  it("reports each image (with its prompt) via onResult as it settles", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(imageResponse("data:image/png;base64,AAA"));
+    const seen: { index: number; prompt?: string }[] = [];
+    await generateBatch(
+      ["a cat", "a dog"],
+      { apiKey: "k", model: "m" },
+      {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        baseSeed: 0,
+        concurrency: 5,
+        onResult: (img) => seen.push({ index: img.index, prompt: img.prompt }),
+      },
+    );
+    expect(seen.sort((a, b) => a.index - b.index)).toEqual([
+      { index: 0, prompt: "a cat" },
+      { index: 1, prompt: "a dog" },
+    ]);
   });
 });

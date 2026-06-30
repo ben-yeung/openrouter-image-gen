@@ -15,11 +15,14 @@ export function useGeneration() {
     setLoading(true);
     setError(null);
     setSavedDir(null);
-    setImages([]);
+    // Seed one pending placeholder per slot so the grid renders immediately and
+    // each image can drop into its slot the moment it arrives.
+    setImages(Array.from({ length: args.count }, (_, i) => ({ index: i, dataUrl: "", pending: true })));
     try {
       const results = await generateVariations(
         { apiKey: args.apiKey, model: args.model, prompt: args.prompt },
         args.count,
+        { onResult: (image) => setImages((prev) => prev.map((img) => (img.index === image.index ? image : img))) },
       );
       setImages(results);
 
@@ -52,12 +55,29 @@ export function useGeneration() {
     setLoading(true);
     setError(null);
     setSavedDir(null);
-    setImages([]);
+    // Seed pending placeholders carrying each slot's prompt/path so they show
+    // their label while generating and fill in as results stream back.
+    setImages(
+      args.items.map((item, i) => ({
+        index: i,
+        dataUrl: "",
+        pending: true,
+        prompt: item.prompt,
+        ...(item.path ? { path: item.path } : {}),
+      })),
+    );
     try {
-      const results = await generateBatch(prompts, {
-        apiKey: args.apiKey,
-        model: args.model,
-      });
+      const results = await generateBatch(
+        prompts,
+        { apiKey: args.apiKey, model: args.model },
+        {
+          onResult: (image) => {
+            const path = args.items[image.index]?.path;
+            const withPath = path ? { ...image, path } : image;
+            setImages((prev) => prev.map((img) => (img.index === image.index ? withPath : img)));
+          },
+        },
+      );
       const withPaths = results.map((r, i) =>
         args.items[i]?.path ? { ...r, path: args.items[i].path } : r,
       );
