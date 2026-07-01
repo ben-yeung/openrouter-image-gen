@@ -7,6 +7,8 @@ vi.mock("@/core", () => ({
   generateBatch: vi.fn(),
   generateImage: vi.fn(),
   batchLabel: (prompts: string[]) => prompts.join(" | "),
+  // Identity is enough for these tests; resolveImagePaths has its own unit tests.
+  resolveImagePaths: (paths: (string | undefined)[]) => paths,
 }));
 
 import { generateVariations, generateBatch, generateImage } from "@/core";
@@ -115,6 +117,98 @@ describe("useGeneration reroll", () => {
 
     expect(result.current.images[0].path).toBe("public/images/villa/01.jpg");
     expect(result.current.images[1].path).toBeUndefined();
+  });
+
+  it("persists a rerolled image into the saved session folder via PATCH", async () => {
+    vi.mocked(generateBatch).mockResolvedValue([
+      img(0, { prompt: "a villa", path: "villa/01.jpg" }),
+      { index: 1, dataUrl: "", error: "No image returned", prompt: "a cabin", path: "cabin/01.jpg" },
+    ]);
+    vi.mocked(generateImage).mockResolvedValue(img(1, { seed: 77 }));
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [
+          { prompt: "a villa", path: "villa/01.jpg" },
+          { prompt: "a cabin", path: "cabin/01.jpg" },
+        ],
+      });
+    });
+    mockFetch.mockClear();
+    await act(async () => { await result.current.reroll(1); });
+
+    const patch = mockFetch.mock.calls.find(([, init]) => init?.method === "PATCH");
+    expect(patch).toBeTruthy();
+    const body = JSON.parse(patch![1].body as string);
+    expect(body.dir).toBe("/tmp");
+    expect(body.file).toBe("cabin/01.jpg");
+    expect(body.image.dataUrl).toBe("data:image/png;base64,AAA1");
+  });
+
+  it("creates the session on a successful reroll when the initial run saved nothing", async () => {
+    // Whole batch failed on the first attempt → no session folder was created.
+    vi.mocked(generateBatch).mockResolvedValue([
+      { index: 0, dataUrl: "", error: "No image returned", prompt: "a villa", path: "villa/01.jpg" },
+    ]);
+    vi.mocked(generateImage).mockResolvedValue(img(0, { seed: 5, prompt: "a villa" }));
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({ apiKey: "k", model: "m", items: [{ prompt: "a villa", path: "villa/01.jpg" }] });
+    });
+    expect(result.current.savedDir).toBeNull();
+    mockFetch.mockClear();
+
+    await act(async () => { await result.current.reroll(0); });
+
+    const post = mockFetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(post).toBeTruthy();
+    const body = JSON.parse(post![1].body as string);
+    expect(body.kind).toBe("batch");
+    expect(body.images).toHaveLength(1);
+    expect(result.current.savedDir).toBe("/tmp");
+  });
+
+  it("does not create duplicate sessions when two failed slots are retried at once", async () => {
+    vi.mocked(generateBatch).mockResolvedValue([
+      { index: 0, dataUrl: "", error: "fail", prompt: "a villa", path: "villa/01.jpg" },
+      { index: 1, dataUrl: "", error: "fail", prompt: "a cabin", path: "cabin/01.jpg" },
+    ]);
+    vi.mocked(generateImage)
+      .mockResolvedValueOnce(img(0, { prompt: "a villa" }))
+      .mockResolvedValueOnce(img(1, { prompt: "a cabin" }));
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({
+        apiKey: "k",
+        model: "m",
+        items: [{ prompt: "a villa", path: "villa/01.jpg" }, { prompt: "a cabin", path: "cabin/01.jpg" }],
+      });
+    });
+    mockFetch.mockClear();
+
+    await act(async () => { await Promise.all([result.current.reroll(0), result.current.reroll(1)]); });
+
+    const posts = mockFetch.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(posts).toHaveLength(1);
+  });
+
+  it("does not attempt to persist a reroll that itself failed", async () => {
+    vi.mocked(generateBatch).mockResolvedValue([img(0, { prompt: "a villa", path: "villa/01.jpg" })]);
+    vi.mocked(generateImage).mockResolvedValue({ index: 0, dataUrl: "", error: "still failing" });
+
+    const { result } = renderHook(() => useGeneration());
+    await act(async () => {
+      await result.current.runBatch({ apiKey: "k", model: "m", items: [{ prompt: "a villa", path: "villa/01.jpg" }] });
+    });
+    mockFetch.mockClear();
+    await act(async () => { await result.current.reroll(0); });
+
+    expect(mockFetch.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
   });
 
   it("preserves the requested path on the rerolled slot", async () => {

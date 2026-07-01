@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { saveSession } from "@/core/storage";
+import { saveSession, saveSessionImage } from "@/core/storage";
 import type { GeneratedImage } from "@/core/types";
 
 export const runtime = "nodejs";
@@ -9,6 +9,12 @@ interface SaveBody {
   model?: string;
   kind?: "variations" | "batch";
   images?: GeneratedImage[];
+}
+
+interface PatchBody {
+  dir?: string;
+  file?: string;
+  image?: GeneratedImage;
 }
 
 // Local-tool assumption: this unauthenticated endpoint writes generated images
@@ -25,6 +31,24 @@ export async function POST(req: Request) {
     }
     const { dir, session } = await saveSession({ prompt, model, kind, images });
     return NextResponse.json({ dir, session });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
+}
+
+// Writes a single rerolled/retried image into an existing session folder so
+// the new image lands on disk at its resolved output name.
+export async function PATCH(req: Request) {
+  try {
+    const { dir, file, image } = (await req.json()) as PatchBody;
+    if (!dir || !file || !image?.dataUrl) {
+      return NextResponse.json(
+        { error: "dir, file and image are required" },
+        { status: 400 },
+      );
+    }
+    const result = await saveSessionImage({ dir, file, image });
+    return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

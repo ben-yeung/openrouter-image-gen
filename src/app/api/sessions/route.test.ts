@@ -45,6 +45,47 @@ describe("POST /api/sessions", () => {
     expect(json.error).toBeTruthy();
   });
 
+  it("PATCH writes a single image into an existing session folder", async () => {
+    const { POST, PATCH } = await import("./route");
+    const b64 = Buffer.from("orig").toString("base64");
+    const postRes = await POST(
+      new Request("http://localhost/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: "a cat",
+          model: "m",
+          kind: "batch",
+          images: [{ index: 0, dataUrl: `data:image/png;base64,${b64}`, seed: 1, prompt: "a cat", path: "cat/01.jpg" }],
+        }),
+      }) as any,
+    );
+    const { dir } = await postRes.json();
+
+    const retry = Buffer.from("retry").toString("base64");
+    const patchRes = await PATCH(
+      new Request("http://localhost/api/sessions", {
+        method: "PATCH",
+        body: JSON.stringify({
+          dir,
+          file: "dog/01.png",
+          image: { index: 1, dataUrl: `data:image/png;base64,${retry}`, seed: 2, prompt: "a dog" },
+        }),
+      }) as any,
+    );
+    expect(patchRes.status).toBe(200);
+    expect((await fs.readFile(path.join(dir, "dog/01.png"))).toString()).toBe("retry");
+    const meta = JSON.parse(await fs.readFile(path.join(dir, "metadata.json"), "utf8"));
+    expect(meta.count).toBe(2);
+  });
+
+  it("PATCH returns 400 when dir, file or image is missing", async () => {
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      new Request("http://localhost/api/sessions", { method: "PATCH", body: JSON.stringify({ dir: "x" }) }) as any,
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("saves a batch with per-image prompts", async () => {
     const { POST } = await import("./route");
     const b64 = Buffer.from("img").toString("base64");
